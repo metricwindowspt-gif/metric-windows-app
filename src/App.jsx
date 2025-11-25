@@ -3,9 +3,15 @@ import './styles/index.css'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import { carregarLogo, salvarLogo, carregarModelos, salvarModelo, deletarModelo as deletarModeloDB, carregarOrcamentos, salvarOrcamento as salvarOrcamentoDB, deletarOrcamento as deletarOrcamentoDB } from './config/database'
+import { fazerLogin, fazerLogout, verificarUsuarioLogado } from './config/auth'
 
 function App() {
     // Estados principais
+        // Estados de autenticação
+    const [usuarioLogado, setUsuarioLogado] = useState(null)
+    const [carregandoAuth, setCarregandoAuth] = useState(true)
+    const [email, setEmail] = useState('')
+    const [senha, setSenha] = useState('')
     const [logo, setLogo] = useState(null)
     const [modelos, setModelos] = useState([])
     const [orcamentos, setOrcamentos] = useState([])
