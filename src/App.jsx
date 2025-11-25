@@ -1,13 +1,15 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import './styles/index.css'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
+import { carregarLogo, salvarLogo, carregarModelos, salvarModelo, deletarModelo as deletarModeloDB, carregarOrcamentos, salvarOrcamento as salvarOrcamentoDB, deletarOrcamento as deletarOrcamentoDB } from './config/database'
 
 function App() {
-    const [logo, setLogo] = useState(() => {
-        const saved = localStorage.getItem('logoMetric')
-        return saved ? saved : null
-    })
+    // Estados principais
+    const [logo, setLogo] = useState(null)
+    const [modelos, setModelos] = useState([])
+    const [orcamentos, setOrcamentos] = useState([])
+    const [carregando, setCarregando] = useState(true)
     
     const [orcamentoID, setOrcamentoID] = useState('')
     const [cliente, setCliente] = useState({
@@ -15,11 +17,6 @@ function App() {
         morada: '',
         contacto: '',
         nif: ''
-    })
-    
-    const [modelos, setModelos] = useState(() => {
-        const saved = localStorage.getItem('modelosJanelas')
-        return saved ? JSON.parse(saved) : []
     })
     
     const [novoModelo, setNovoModelo] = useState({
@@ -95,19 +92,52 @@ A Metric Windows PT compromete-se a cumprir os custos e valores definidos na pro
 Caso o cliente solicite alterações ao orçamento após a adjudicação, o valor poderá ser ajustado, resultando em aumento ou diminuição do montante inicialmente orçamentado. Todas as alterações deverão ser previamente aprovadas pelo cliente e formalizadas por escrito.`
     )
     
-    const [orcamentos, setOrcamentos] = useState(() => {
-        const saved = localStorage.getItem('orcamentosMetric')
-        return saved ? JSON.parse(saved) : []
-    })
-    
     const [abaAtiva, setAbaAtiva] = useState('orcamento')
     const [orcamentoAtual, setOrcamentoAtual] = useState(null)
     
+    // ========== CARREGAR DADOS DO FIREBASE (USEEFFECT) ==========
+    useEffect(() => {
+        const carregarDadosIniciais = async () => {
+            try {
+                setCarregando(true)
+                console.log('🔄 Carregando dados do Firebase...')
+                
+                // Carregar logo
+                const logoSalvo = await carregarLogo()
+                if (logoSalvo) {
+                    setLogo(logoSalvo)
+                    console.log('✅ Logo carregado!')
+                }
+                
+                // Carregar modelos
+                const modelosSalvos = await carregarModelos()
+                setModelos(modelosSalvos)
+                console.log(`✅ ${modelosSalvos.length} modelos carregados!`)
+                
+                // Carregar orçamentos
+                const orcamentosSalvos = await carregarOrcamentos()
+                setOrcamentos(orcamentosSalvos)
+                console.log(`✅ ${orcamentosSalvos.length} orçamentos carregados!`)
+                
+                console.log('✅ Todos os dados carregados do Firebase!')
+            } catch (error) {
+                console.error('❌ Erro ao carregar dados:', error)
+                alert('Erro ao carregar dados do Firebase. Verifique a conexão e tente novamente.')
+            } finally {
+                setCarregando(false)
+            }
+        }
+        
+        carregarDadosIniciais()
+    }, [])
+    
+    // ========== FUNÇÕES UTILITÁRIAS ==========
     const gerarID = () => {
         return Math.random().toString(36).substr(2, 9).toUpperCase()
     }
     
-    const salvarOrcamento = () => {
+    // ========== FUNÇÕES DE ORÇAMENTO (FIREBASE) ==========
+    const salvarOrcamento = async () => {
         if (!cliente.nome.trim()) {
             alert('Por favor, preencha o nome do cliente!')
             return
@@ -128,19 +158,24 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             logo
         }
         
-        if (orcamentoAtual) {
-            const updatedOrcamentos = orcamentos.map(o => 
-                o.id === novoOrcamento.id ? novoOrcamento : o
-            )
-            setOrcamentos(updatedOrcamentos)
-            localStorage.setItem('orcamentosMetric', JSON.stringify(updatedOrcamentos))
-            alert(`✅ Orçamento #${novoOrcamento.id} atualizado com sucesso!`)
-        } else {
-            const novosOrcamentos = [...orcamentos, novoOrcamento]
-            setOrcamentos(novosOrcamentos)
-            localStorage.setItem('orcamentosMetric', JSON.stringify(novosOrcamentos))
-            setOrcamentoAtual(novoOrcamento)
-            alert(`✅ Orçamento #${novoOrcamento.id} criado com sucesso!`)
+        try {
+            await salvarOrcamentoDB(novoOrcamento)
+            
+            if (orcamentoAtual) {
+                const updatedOrcamentos = orcamentos.map(o => 
+                    o.id === novoOrcamento.id ? novoOrcamento : o
+                )
+                setOrcamentos(updatedOrcamentos)
+                alert(`✅ Orçamento #${novoOrcamento.id} atualizado com sucesso!`)
+            } else {
+                const novosOrcamentos = [...orcamentos, novoOrcamento]
+                setOrcamentos(novosOrcamentos)
+                setOrcamentoAtual(novoOrcamento)
+                alert(`✅ Orçamento #${novoOrcamento.id} criado com sucesso!`)
+            }
+        } catch (error) {
+            console.error('❌ Erro ao salvar orçamento:', error)
+            alert('Erro ao salvar orçamento no Firebase. Tente novamente.')
         }
     }
     
@@ -155,12 +190,17 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         alert(`✅ Orçamento #${orcamento.id} carregado! Agora pode editar.`)
     }
     
-    const deletarOrcamento = (id) => {
+    const deletarOrcamento = async (id) => {
         if (window.confirm('Tem a certeza que deseja apagar este orçamento?')) {
-            const novosOrcamentos = orcamentos.filter(o => o.id !== id)
-            setOrcamentos(novosOrcamentos)
-            localStorage.setItem('orcamentosMetric', JSON.stringify(novosOrcamentos))
-            alert('✅ Orçamento apagado!')
+            try {
+                await deletarOrcamentoDB(id)
+                const novosOrcamentos = orcamentos.filter(o => o.id !== id)
+                setOrcamentos(novosOrcamentos)
+                alert('✅ Orçamento apagado!')
+            } catch (error) {
+                console.error('❌ Erro ao deletar orçamento:', error)
+                alert('Erro ao deletar orçamento. Tente novamente.')
+            }
         }
     }
     
@@ -179,30 +219,43 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         setAbaAtiva('orcamento')
     }
     
-    const adicionarModelo = () => {
+    // ========== FUNÇÕES DE MODELOS (FIREBASE) ==========
+    const adicionarModelo = async () => {
         if (!novoModelo.nome.trim()) {
             alert('Por favor, digite o nome do modelo!')
             return
         }
         
-        const modelo = {
-            id: Date.now(),
-            nome: novoModelo.nome,
-            foto: novoModelo.foto
+        try {
+            const modelo = {
+                id: Date.now(),
+                nome: novoModelo.nome,
+                foto: novoModelo.foto
+            }
+            
+            await salvarModelo(modelo)
+            
+            const novosModelos = [...modelos, modelo]
+            setModelos(novosModelos)
+            
+            setNovoModelo({ nome: '', foto: null })
+            alert('✅ Modelo adicionado com sucesso!')
+        } catch (error) {
+            console.error('❌ Erro ao adicionar modelo:', error)
+            alert('Erro ao adicionar modelo. Tente novamente.')
         }
-        
-        const novosModelos = [...modelos, modelo]
-        setModelos(novosModelos)
-        localStorage.setItem('modelosJanelas', JSON.stringify(novosModelos))
-        
-        setNovoModelo({ nome: '', foto: null })
-        alert('Modelo adicionado com sucesso!')
     }
     
-    const deletarModelo = (id) => {
-        const novosModelos = modelos.filter(m => m.id !== id)
-        setModelos(novosModelos)
-        localStorage.setItem('modelosJanelas', JSON.stringify(novosModelos))
+    const deletarModelo = async (id) => {
+        try {
+            await deletarModeloDB(id)
+            const novosModelos = modelos.filter(m => m.id !== id)
+            setModelos(novosModelos)
+            alert('✅ Modelo deletado com sucesso!')
+        } catch (error) {
+            console.error('❌ Erro ao deletar modelo:', error)
+            alert('Erro ao deletar modelo. Tente novamente.')
+        }
     }
     
     const handleFotoModelo = (e) => {
@@ -216,6 +269,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         }
     }
     
+    // ========== FUNÇÕES DE JANELAS ==========
     const adicionarJanela = () => {
         const novaJanela = {
             id: Date.now(),
@@ -249,18 +303,27 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         }
     }
     
-    const handleLogoUpload = (e) => {
+    // ========== FUNÇÃO DE LOGO (FIREBASE) ==========
+    const handleLogoUpload = async (e) => {
         const file = e.target.files[0]
         if (file) {
             const reader = new FileReader()
-            reader.onloadend = () => {
-                setLogo(reader.result)
-                localStorage.setItem('logoMetric', reader.result)
+            reader.onloadend = async () => {
+                try {
+                    setLogo(reader.result)
+                    await salvarLogo(reader.result)
+                    console.log('✅ Logo salvo no Firebase!')
+                    alert('✅ Logo salvo com sucesso!')
+                } catch (error) {
+                    console.error('❌ Erro ao salvar logo:', error)
+                    alert('Erro ao salvar logo. Tente novamente.')
+                }
             }
             reader.readAsDataURL(file)
         }
     }
     
+    // ========== CÁLCULOS ==========
     const calcularPrecoJanela = (preco, precoMontagem, desconto, percentualExtra = 0, quantidade = 1) => {
         const precoJanela = parseFloat(preco || 0)
         const precoMont = parseFloat(precoMontagem || 0)
@@ -320,7 +383,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         return percentual > 0 ? `+${percentual}%` : '-'
     }
 
-    // ✅ FUNÇÃO GERADOR PDF - CORRIGIDA E REORGANIZADA
+    // ========== GERADOR DE PDF ==========
     const gerarPDF = () => {
         const doc = new jsPDF('p', 'mm', 'a4')
         let yPos = 20
@@ -353,7 +416,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         yPos += 25
         doc.setTextColor(0, 0, 0)
         
-        // 3️⃣ DADOS DO CLIENTE (PRIMEIRO)
+        // 3️⃣ DADOS DO CLIENTE
         doc.setFontSize(12)
         doc.setFont(undefined, 'bold')
         doc.setTextColor(0, 42, 77)
@@ -383,7 +446,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         
         yPos += 5
         
-        // 4️⃣ TABELA DE JANELAS (SEGUNDO) - AGORA FORA DO BLOCO DE FOTOS
+        // 4️⃣ TABELA DE JANELAS
         if (yPos > 240) {
             doc.addPage()
             yPos = 20
@@ -435,7 +498,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         
         yPos = doc.lastAutoTable.finalY + 8
         
-        // 5️⃣ MODELOS SELECIONADOS COM FOTOS (TERCEIRO)
+        // 5️⃣ MODELOS COM FOTOS
         const janelasComFoto = janelas.filter(j => j.modelo?.foto)
         
         if (janelasComFoto.length > 0) {
@@ -499,7 +562,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             yPos += 3
         }
         
-        // 6️⃣ RESUMO FINANCEIRO (QUARTO)
+        // 6️⃣ RESUMO FINANCEIRO
         if (yPos > 240) {
             doc.addPage()
             yPos = 20
@@ -550,7 +613,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         
         yPos += 15
         
-        // 7️⃣ CONDIÇÕES (FINAL)
+        // 7️⃣ CONDIÇÕES
         if (yPos > 250) {
             doc.addPage()
             yPos = 20
@@ -594,6 +657,31 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         doc.save(nomeArquivo)
     }
 
+    // ========== TELA DE CARREGAMENTO ==========
+    if (carregando) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                fontSize: '24px',
+                flexDirection: 'column',
+                gap: '20px',
+                backgroundColor: '#f0f4f8'
+            }}>
+                <div style={{ fontSize: '48px' }}>⏳</div>
+                <div style={{ fontWeight: 'bold', color: '#002a4d' }}>
+                    Carregando dados do Firebase...
+                </div>
+                <div style={{ fontSize: '16px', color: '#666' }}>
+                    Aguarde enquanto sincronizamos seus dados
+                </div>
+            </div>
+        )
+    }
+
+    // ========== RENDER PRINCIPAL ==========
     return (
         <div className="min-h-screen bg-metric-gray-light py-8 px-4">
             <div className="max-w-7xl mx-auto">
@@ -1165,8 +1253,8 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 <div className="mt-4 text-xs text-metric-gray-medium space-y-1">
                                     <p>✓ Montagem embutida</p>
                                     <p>✓ IVAs separados</p>
-                                    <p>✓ Base de dados</p>
-                                    <p>✓ Histórico</p>
+                                    <p>✓ Firebase conectado</p>
+                                    <p>✓ Dados na nuvem ☁️</p>
                                 </div>
                             </div>
                         </div>

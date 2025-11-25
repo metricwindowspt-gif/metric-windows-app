@@ -1,0 +1,1182 @@
+import React, { useState } from 'react'
+import './styles/index.css'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+
+function App() {
+    const [logo, setLogo] = useState(() => {
+        const saved = localStorage.getItem('logoMetric')
+        return saved ? saved : null
+    })
+    
+    const [orcamentoID, setOrcamentoID] = useState('')
+    const [cliente, setCliente] = useState({
+        nome: '',
+        morada: '',
+        contacto: '',
+        nif: ''
+    })
+    
+    const [modelos, setModelos] = useState(() => {
+        const saved = localStorage.getItem('modelosJanelas')
+        return saved ? JSON.parse(saved) : []
+    })
+    
+    const [novoModelo, setNovoModelo] = useState({
+        nome: '',
+        foto: null
+    })
+    
+    const [janelas, setJanelas] = useState([
+        {
+            id: 1,
+            descricao: '',
+            preco: 0,
+            precoMontagem: 0,
+            desconto: 0,
+            quantidade: 1,
+            percentualExtra: 0,
+            modelo: null
+        }
+    ])
+    
+    const [condicoesFornecimento, setCondicoesFornecimento] = useState(
+        `FORMA DE PAGAMENTO
+50% ADJUDICAÇÃO
+30% ANTES DE ENTRAR EM OBRA
+20% APÓS A MONTAGEM
+
+IBAN PT50003300004577424422605
+
+1. VERIFICAÇÃO DE MEDIDAS FINAIS E CONDIÇÕES PARA A VISITA TÉCNICA
+Será agendada uma visita técnica para verificação das medidas finais, sendo obrigatória a presença da parte responsável pela obra no local designado. Na hipótese de ausência do responsável, será necessário um novo agendamento, o qual implicará um custo adicional a partir de 120€, previamente informado e confirmado pelo cliente. O atraso superior a 15 (quinze) minutos, sem aviso prévio, será considerado ausência, aplicando-se as condições acima descritas.
+
+Durante a visita técnica, o local deverá estar em condições adequadas para a realização da medição, sendo responsabilidade do cliente garantir a acessibilidade aos vãos onde os trabalhos serão executados.
+
+2. ALTERAÇÕES AO ORÇAMENTO, DESMONTAGEM E EXTRAÇÃO DE MATERIAIS ANTIGOS
+Após a visita técnica, além da aferição das medidas, será realizada uma análise da complexidade técnica para a montagem dos produtos. Caso seja necessária a desmontagem e extração de materiais antigos, será aplicado um custo adicional de 20,00€ por unidade, exclusivamente para materiais em madeira ou ferro, devido à complexidade das operações.
+
+O cliente será previamente informado e deverá confirmar a aceitação dos custos adicionais antes da realização dos serviços.
+
+3. CONDIÇÕES DE VALIDADE DA ENCOMENDA
+Após a finalização do orçamento, o cliente receberá um resumo detalhado dos termos da encomenda por e-mail. A encomenda será considerada finalizada e vinculativa apenas após a confirmação expressa do cliente, por escrito, através de e-mail ou outro meio de comunicação previamente acordado.
+
+4. EXCLUSÃO DE RESPONSABILIDADE
+Não estão incluídos nas propostas:
+- Acessórios ou consumíveis necessários à execução da obra;
+- Quaisquer elementos não especificados na proposta orçamentária.
+
+5. RESPONSABILIDADE PELAS MEDIDAS E MONTAGEM
+A responsabilidade pela precisão das medidas será exclusivamente da Metric Windows PT somente nos casos em que a montagem dos produtos for realizada pela própria empresa.
+
+Após a entrega dos produtos, o cliente deverá verificar e confirmar que os mesmos foram entregues em conformidade com o orçamento e as especificações acordadas. Essa confirmação será considerada como aceitação formal dos produtos entregues.
+
+Caso a montagem seja realizada pelo cliente ou por terceiros contratados pelo cliente, a Metric Windows PT não se responsabiliza por problemas decorrentes de:
+- Mau uso dos produtos;
+- Erros na execução da montagem;
+- Danos causados durante a instalação;
+- Uso de silicones de má qualidade.
+
+A garantia fornecida pela Metric Windows PT será limitada exclusivamente aos termos descritos nas Condições de Garantia, cobrindo apenas defeitos de fabrico ou materiais, conforme estipulado no Decreto-Lei n.º 84/2021.
+
+O cliente declara estar ciente de que quaisquer serviços adicionais não previstos no orçamento estarão sujeitos a novo orçamento e aprovação prévia.
+
+6. ASSISTÊNCIA TÉCNICA MONTAGEM E PRODUTO
+Pedidos de assistência técnica ao abrigo da garantia serão atendidos no prazo máximo de 30 (trinta) dias úteis, a contar da data do pedido. A garantia cobre exclusivamente defeitos de fabrico ou montagem, conforme previsto no Decreto-Lei n.º 84/2021.
+
+Pedidos fora do âmbito da garantia estarão sujeitos a orçamento prévio, que deverá ser aprovado pelo cliente antes da realização dos serviços.
+
+7. PUBLICIDADE
+Ao adjudicar a proposta, o cliente autoriza a empresa a incluir o seu nome, logótipo e imagens da obra no seu site, redes sociais ou materiais promocionais, desde que sejam respeitados a privacidade e os direitos do cliente, sem qualquer contrapartida financeira.
+
+8. ALTERAÇÕES AO ORÇAMENTO APÓS ADJUDICAÇÃO
+A Metric Windows PT compromete-se a cumprir os custos e valores definidos na proposta orçamentária após a confirmação do cliente, salvo em situações que justifiquem a revisão do orçamento, conforme previsto neste contrato.
+
+Caso o cliente solicite alterações ao orçamento após a adjudicação, o valor poderá ser ajustado, resultando em aumento ou diminuição do montante inicialmente orçamentado. Todas as alterações deverão ser previamente aprovadas pelo cliente e formalizadas por escrito.`
+    )
+    
+    const [orcamentos, setOrcamentos] = useState(() => {
+        const saved = localStorage.getItem('orcamentosMetric')
+        return saved ? JSON.parse(saved) : []
+    })
+    
+    const [abaAtiva, setAbaAtiva] = useState('orcamento')
+    const [orcamentoAtual, setOrcamentoAtual] = useState(null)
+    
+    const gerarID = () => {
+        return Math.random().toString(36).substr(2, 9).toUpperCase()
+    }
+    
+    const salvarOrcamento = () => {
+        if (!cliente.nome.trim()) {
+            alert('Por favor, preencha o nome do cliente!')
+            return
+        }
+        
+        if (!orcamentoID.trim()) {
+            alert('Por favor, preencha o ID do Orçamento (ex: 460)!')
+            return
+        }
+        
+        const novoOrcamento = {
+            id: orcamentoAtual?.id || orcamentoID,
+            dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
+            dataModificacao: new Date().toLocaleDateString('pt-PT'),
+            cliente,
+            janelas,
+            condicoesFornecimento,
+            logo
+        }
+        
+        if (orcamentoAtual) {
+            const updatedOrcamentos = orcamentos.map(o => 
+                o.id === novoOrcamento.id ? novoOrcamento : o
+            )
+            setOrcamentos(updatedOrcamentos)
+            localStorage.setItem('orcamentosMetric', JSON.stringify(updatedOrcamentos))
+            alert(`✅ Orçamento #${novoOrcamento.id} atualizado com sucesso!`)
+        } else {
+            const novosOrcamentos = [...orcamentos, novoOrcamento]
+            setOrcamentos(novosOrcamentos)
+            localStorage.setItem('orcamentosMetric', JSON.stringify(novosOrcamentos))
+            setOrcamentoAtual(novoOrcamento)
+            alert(`✅ Orçamento #${novoOrcamento.id} criado com sucesso!`)
+        }
+    }
+    
+    const carregarOrcamento = (orcamento) => {
+        setCliente(orcamento.cliente)
+        setJanelas(orcamento.janelas)
+        setCondicoesFornecimento(orcamento.condicoesFornecimento)
+        setLogo(orcamento.logo)
+        setOrcamentoAtual(orcamento)
+        setOrcamentoID(orcamento.id)
+        setAbaAtiva('orcamento')
+        alert(`✅ Orçamento #${orcamento.id} carregado! Agora pode editar.`)
+    }
+    
+    const deletarOrcamento = (id) => {
+        if (window.confirm('Tem a certeza que deseja apagar este orçamento?')) {
+            const novosOrcamentos = orcamentos.filter(o => o.id !== id)
+            setOrcamentos(novosOrcamentos)
+            localStorage.setItem('orcamentosMetric', JSON.stringify(novosOrcamentos))
+            alert('✅ Orçamento apagado!')
+        }
+    }
+    
+    const novoOrcamento = () => {
+        setCliente({ nome: '', morada: '', contacto: '', nif: '' })
+        setJanelas([{
+            id: 1,
+            descricao: '',
+            preco: 0,
+            precoMontagem: 0,
+            desconto: 0,
+            modelo: null
+        }])
+        setOrcamentoAtual(null)
+        setOrcamentoID('')
+        setAbaAtiva('orcamento')
+    }
+    
+    const adicionarModelo = () => {
+        if (!novoModelo.nome.trim()) {
+            alert('Por favor, digite o nome do modelo!')
+            return
+        }
+        
+        const modelo = {
+            id: Date.now(),
+            nome: novoModelo.nome,
+            foto: novoModelo.foto
+        }
+        
+        const novosModelos = [...modelos, modelo]
+        setModelos(novosModelos)
+        localStorage.setItem('modelosJanelas', JSON.stringify(novosModelos))
+        
+        setNovoModelo({ nome: '', foto: null })
+        alert('Modelo adicionado com sucesso!')
+    }
+    
+    const deletarModelo = (id) => {
+        const novosModelos = modelos.filter(m => m.id !== id)
+        setModelos(novosModelos)
+        localStorage.setItem('modelosJanelas', JSON.stringify(novosModelos))
+    }
+    
+    const handleFotoModelo = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setNovoModelo({ ...novoModelo, foto: reader.result })
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+    
+    const adicionarJanela = () => {
+        const novaJanela = {
+            id: Date.now(),
+            descricao: '',
+            preco: 0,
+            precoMontagem: 0,
+            desconto: 0,
+            quantidade: 1,
+            percentualExtra: 0,
+            modelo: null
+        }
+        setJanelas([...janelas, novaJanela])
+    }
+    
+    const removerJanela = (id) => {
+        if (janelas.length > 1) {
+            setJanelas(janelas.filter(j => j.id !== id))
+        }
+    }
+    
+    const atualizarJanela = (id, campo, valor) => {
+        setJanelas(janelas.map(j => 
+            j.id === id ? { ...j, [campo]: valor } : j
+        ))
+    }
+    
+    const usarModelo = (id, janelaId) => {
+        const modelo = modelos.find(m => m.id === id)
+        if (modelo) {
+            atualizarJanela(janelaId, 'modelo', modelo)
+        }
+    }
+    
+    const handleLogoUpload = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setLogo(reader.result)
+                localStorage.setItem('logoMetric', reader.result)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+    
+    const calcularPrecoJanela = (preco, precoMontagem, desconto, percentualExtra = 0, quantidade = 1) => {
+        const precoJanela = parseFloat(preco || 0)
+        const precoMont = parseFloat(precoMontagem || 0)
+        const descontoNumerico = parseFloat(desconto || 0)
+        const percentualNumerico = parseFloat(percentualExtra || 0)
+        
+        let precoJanelaFinal = precoJanela * (1 - descontoNumerico / 100)
+        precoJanelaFinal = precoJanelaFinal * (1 + percentualNumerico / 100)
+        
+        let precoMontFinal = precoMont * (1 + percentualNumerico / 100)
+        
+        const valorFinal = (precoJanelaFinal + precoMontFinal) * parseFloat(quantidade || 1)
+        
+        return valorFinal
+    }
+    
+    const subtotalJanelas = janelas.reduce((sum, j) => {
+        return sum + calcularPrecoJanela(j.preco, j.precoMontagem, j.desconto, j.percentualExtra, j.quantidade)
+    }, 0)
+    const totalSemIVA = subtotalJanelas
+    
+    const calcularIVAs = () => {
+        let ivaProduto = 0
+        let ivaMontagem = 0
+        
+        janelas.forEach(j => {
+            const precoJanela = parseFloat(j.preco || 0)
+            const precoMont = parseFloat(j.precoMontagem || 0)
+            const desc = parseFloat(j.desconto || 0) / 100
+            const percExtra = parseFloat(j.percentualExtra || 0) / 100
+            const qtd = parseFloat(j.quantidade || 1)
+            
+            const precoJanelaFinal = precoJanela * (1 - desc) * (1 + percExtra) * qtd
+            const precoMontFinal = precoMont * (1 + percExtra) * qtd
+            
+            ivaProduto += precoJanelaFinal * 0.23
+            ivaMontagem += precoMontFinal * 0.06
+        })
+        
+        return { ivaProduto, ivaMontagem }
+    }
+    
+    const { ivaProduto, ivaMontagem } = calcularIVAs()
+    const totalIVA = ivaProduto + ivaMontagem
+    const totalComIVA = totalSemIVA + totalIVA
+    
+    const formatarMoeda = (valor) => {
+        return new Intl.NumberFormat('pt-PT', {
+            style: 'currency',
+            currency: 'EUR'
+        }).format(valor)
+    }
+    
+    const getAcabamentoNome = (percentual) => {
+        if (percentual === 15) return 'COLORIDA 1 FACE'
+        if (percentual === 20) return 'COLORIDA 2 FACES'
+        return percentual > 0 ? `+${percentual}%` : '-'
+    }
+
+    // ✅ FUNÇÃO GERADOR PDF - CORRIGIDA E REORGANIZADA
+    const gerarPDF = () => {
+        const doc = new jsPDF('p', 'mm', 'a4')
+        let yPos = 20
+        
+        // 1️⃣ LOGO
+        if (logo) {
+            try {
+                const formato = logo.includes('data:image/png') ? 'PNG' : 'JPEG'
+                doc.addImage(logo, formato, 15, yPos, 35, 15)
+                yPos += 20
+            } catch (error) {
+                console.log('Erro ao adicionar logo:', error)
+                yPos += 5
+            }
+        }
+        
+        // 2️⃣ CABEÇALHO
+        doc.setFillColor(0, 42, 77)
+        doc.rect(0, yPos, 210, 20, 'F')
+        
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(18)
+        doc.setFont(undefined, 'bold')
+        doc.text('METRIC WINDOWS PT', 105, yPos + 7, { align: 'center' })
+        
+        doc.setFontSize(11)
+        doc.setFont(undefined, 'normal')
+        doc.text(`ORÇAMENTO ${orcamentoAtual?.id || orcamentoID || 'NOVO'}`, 105, yPos + 14, { align: 'center' })
+        
+        yPos += 25
+        doc.setTextColor(0, 0, 0)
+        
+        // 3️⃣ DADOS DO CLIENTE (PRIMEIRO)
+        doc.setFontSize(12)
+        doc.setFont(undefined, 'bold')
+        doc.setTextColor(0, 42, 77)
+        doc.text('DADOS DO CLIENTE', 15, yPos)
+        yPos += 6
+        
+        doc.setFontSize(9)
+        doc.setFont(undefined, 'normal')
+        doc.setTextColor(0, 0, 0)
+        
+        if (cliente.nome) {
+            doc.text(`Nome: ${cliente.nome}`, 15, yPos)
+            yPos += 4
+        }
+        if (cliente.morada) {
+            doc.text(`Morada: ${cliente.morada}`, 15, yPos)
+            yPos += 4
+        }
+        if (cliente.contacto) {
+            doc.text(`Contacto: ${cliente.contacto}`, 15, yPos)
+            yPos += 4
+        }
+        if (cliente.nif) {
+            doc.text(`NIF: ${cliente.nif}`, 15, yPos)
+            yPos += 4
+        }
+        
+        yPos += 5
+        
+        // 4️⃣ TABELA DE JANELAS (SEGUNDO) - AGORA FORA DO BLOCO DE FOTOS
+        if (yPos > 240) {
+            doc.addPage()
+            yPos = 20
+        }
+        
+        doc.setFontSize(12)
+        doc.setFont(undefined, 'bold')
+        doc.setTextColor(0, 42, 77)
+        doc.text('JANELAS', 15, yPos)
+        yPos += 4
+        
+        const tabelaJanelas = janelas.map((janela, index) => {
+            const precoComDesconto = calcularPrecoJanela(janela.preco, janela.precoMontagem, janela.desconto, janela.percentualExtra, janela.quantidade)
+            return [
+                `#${index + 1}`,
+                janela.descricao || 'Sem descrição',
+                `${janela.quantidade}x`,
+                formatarMoeda(parseFloat(janela.preco || 0) + parseFloat(janela.precoMontagem || 0)),
+                janela.desconto > 0 ? `${janela.desconto}%` : '-',
+                getAcabamentoNome(janela.percentualExtra),
+                formatarMoeda(precoComDesconto)
+            ]
+        })
+        
+        doc.autoTable({
+            startY: yPos,
+            head: [['Item', 'Descrição', 'Qtd', 'Janela+Montagem', 'Desconto na janela', 'Extra', 'Subtotal']],
+            body: tabelaJanelas,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [0, 42, 77],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 9
+            },
+            bodyStyles: {
+                fontSize: 8
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            margin: { left: 15, right: 15 },
+            columnStyles: {
+                2: { halign: 'right' },
+                3: { halign: 'center' },
+                4: { halign: 'right' }
+            }
+        })
+        
+        yPos = doc.lastAutoTable.finalY + 8
+        
+        // 5️⃣ MODELOS SELECIONADOS COM FOTOS (TERCEIRO)
+        const janelasComFoto = janelas.filter(j => j.modelo?.foto)
+        
+        if (janelasComFoto.length > 0) {
+            if (yPos > 240) {
+                doc.addPage()
+                yPos = 20
+            }
+            
+            doc.setFontSize(12)
+            doc.setFont(undefined, 'bold')
+            doc.setTextColor(0, 42, 77)
+            doc.text('MODELOS SELECIONADOS', 15, yPos)
+            yPos += 8
+            
+            janelasComFoto.forEach((janela, index) => {
+                if (yPos > 235) {
+                    doc.addPage()
+                    yPos = 20
+                }
+                
+                try {
+                    doc.addImage(janela.modelo.foto, 'PNG', 15, yPos, 35, 35)
+                    
+                    doc.setTextColor(0, 0, 0)
+                    doc.setFontSize(9)
+                    doc.setFont(undefined, 'bold')
+                    doc.text(`${janela.modelo.nome}`, 55, yPos + 3)
+                    
+                    doc.setFontSize(7)
+                    doc.setFont(undefined, 'normal')
+                    
+                    const linhasDescricao = doc.splitTextToSize(janela.descricao, 145)
+                    doc.text(linhasDescricao, 55, yPos + 9)
+                    
+                    const proximaLinha = yPos + 9 + (linhasDescricao.length * 3)
+                    
+                    doc.setFont(undefined, 'normal')
+                    doc.setTextColor(0, 0, 0)
+                    const precoTotal = parseFloat(janela.preco || 0) + parseFloat(janela.precoMontagem || 0)
+                    doc.text(`Preço: ${formatarMoeda(precoTotal)}`, 55, proximaLinha + 2)
+                    
+                    let linhaExtra = 0
+                    
+                    if (janela.desconto > 0) {
+                        doc.text(`Desconto: -${janela.desconto}%`, 55, proximaLinha + 6)
+                        linhaExtra = 4
+                    }
+                    
+                    if (janela.percentualExtra > 0) {
+                        doc.text(`Acabamento: ${getAcabamentoNome(janela.percentualExtra)}`, 55, proximaLinha + 6 + linhaExtra)
+                        linhaExtra += 4
+                    }
+                    
+                    yPos += 42
+                } catch (error) {
+                    console.log('Erro ao adicionar foto:', error)
+                    yPos += 10
+                }
+            })
+            
+            yPos += 3
+        }
+        
+        // 6️⃣ RESUMO FINANCEIRO (QUARTO)
+        if (yPos > 240) {
+            doc.addPage()
+            yPos = 20
+        }
+        
+        doc.setFontSize(12)
+        doc.setFont(undefined, 'bold')
+        doc.setTextColor(0, 42, 77)
+        doc.text('RESUMO FINANCEIRO', 15, yPos)
+        yPos += 5
+        
+        doc.setFontSize(10)
+        doc.setFont(undefined, 'normal')
+        doc.setTextColor(0, 0, 0)
+        
+        const resumoData = [
+            ['Total (sem IVA):', formatarMoeda(totalSemIVA)],
+            ['', ''],
+            ['IVA Produto (23%):', formatarMoeda(ivaProduto)],
+            ['IVA Montagem (6%):', formatarMoeda(ivaMontagem)],
+        ]
+        
+        doc.autoTable({
+            startY: yPos,
+            body: resumoData,
+            theme: 'plain',
+            styles: {
+                fontSize: 9
+            },
+            columnStyles: {
+                0: { cellWidth: 90 },
+                1: { halign: 'right', cellWidth: 80 }
+            },
+            margin: { left: 15, right: 15 }
+        })
+        
+        yPos = doc.lastAutoTable.finalY + 5
+        
+        // TOTAL GERAL
+        doc.setFillColor(0, 42, 77)
+        doc.rect(15, yPos, 180, 10, 'F')
+        
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(12)
+        doc.setFont(undefined, 'bold')
+        doc.text('TOTAL COM IVA:', 18, yPos + 6.5)
+        doc.text(formatarMoeda(totalComIVA), 190, yPos + 6.5, { align: 'right' })
+        
+        yPos += 15
+        
+        // 7️⃣ CONDIÇÕES (FINAL)
+        if (yPos > 250) {
+            doc.addPage()
+            yPos = 20
+        }
+        
+        doc.setTextColor(0, 42, 77)
+        doc.setFontSize(12)
+        doc.setFont(undefined, 'bold')
+        doc.text('CONDIÇÕES DE FORNECIMENTO', 15, yPos)
+        yPos += 5
+        
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(8)
+        doc.setFont(undefined, 'normal')
+        
+        const condicoesLinhas = doc.splitTextToSize(condicoesFornecimento, 180)
+        doc.text(condicoesLinhas, 15, yPos)
+        
+        // RODAPÉ
+        const totalPages = doc.internal.pages.length - 1
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i)
+            doc.setFontSize(7)
+            doc.setTextColor(150, 150, 150)
+            doc.text(
+                `Metric Windows PT - Orçamento gerado em ${new Date().toLocaleDateString('pt-PT')}`,
+                105,
+                285,
+                { align: 'center' }
+            )
+            doc.text(`Página ${i} de ${totalPages}`, 190, 285, { align: 'right' })
+        }
+        
+        // SALVAR
+        const nomeCliente = cliente.nome || 'Cliente'
+        const dataAtual = new Date().toISOString().split('T')[0]
+        const nomeArquivo = orcamentoID 
+            ? `Orcamento_${orcamentoID}_${nomeCliente}_${dataAtual}.pdf`
+            : `Orcamento_MetricWindows_${nomeCliente}_${dataAtual}.pdf`
+        
+        doc.save(nomeArquivo)
+    }
+
+    return (
+        <div className="min-h-screen bg-metric-gray-light py-8 px-4">
+            <div className="max-w-7xl mx-auto">
+                
+                {/* CABEÇALHO */}
+                <div className="bg-metric-blue rounded-2xl shadow-2xl p-8 mb-8 text-center">
+                    {logo && (
+                        <img 
+                            src={logo} 
+                            alt="Logo" 
+                            className="h-24 mx-auto mb-4 object-contain"
+                        />
+                    )}
+                    <h1 className="text-4xl font-bold text-white mb-2">
+                        METRIC WINDOWS PT
+                    </h1>
+                    <p className="text-metric-orange text-xl font-semibold">
+                        Sistema de Orçamentação Profissional
+                    </p>
+                    {orcamentoID && (
+                        <p className="text-metric-orange text-sm mt-2">
+                            ORÇAMENTO <span className="font-bold">{orcamentoID}</span> {orcamentoAtual && `• Criado em ${orcamentoAtual.dataCriacao}`}
+                        </p>
+                    )}
+                </div>
+
+                {/* ABAS */}
+                <div className="flex gap-2 mb-8 flex-wrap">
+                    <button
+                        onClick={() => setAbaAtiva('orcamento')}
+                        className={`px-6 py-3 rounded-lg font-bold transition-all ${
+                            abaAtiva === 'orcamento'
+                                ? 'bg-metric-blue text-white shadow-lg'
+                                : 'bg-white text-metric-blue border-2 border-metric-blue'
+                        }`}
+                    >
+                        📋 Orçamento {orcamentoAtual && `#${orcamentoAtual.id}`}
+                    </button>
+                    <button
+                        onClick={() => setAbaAtiva('modelos')}
+                        className={`px-6 py-3 rounded-lg font-bold transition-all ${
+                            abaAtiva === 'modelos'
+                                ? 'bg-metric-orange text-white shadow-lg'
+                                : 'bg-white text-metric-orange border-2 border-metric-orange'
+                        }`}
+                    >
+                        🪟 Modelos ({modelos.length})
+                    </button>
+                    <button
+                        onClick={() => setAbaAtiva('historico')}
+                        className={`px-6 py-3 rounded-lg font-bold transition-all ${
+                            abaAtiva === 'historico'
+                                ? 'bg-green-600 text-white shadow-lg'
+                                : 'bg-white text-green-600 border-2 border-green-600'
+                        }`}
+                    >
+                        📁 Histórico ({orcamentos.length})
+                    </button>
+                </div>
+
+                {/* ABA DE HISTÓRICO */}
+                {abaAtiva === 'historico' && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+                        <h2 className="text-2xl font-bold text-metric-blue mb-6 flex items-center gap-2">
+                            📁 Histórico de Orçamentos
+                        </h2>
+
+                        {orcamentos.length === 0 ? (
+                            <p className="text-metric-gray-medium text-center py-8">
+                                Nenhum orçamento criado ainda.
+                            </p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="bg-metric-gray-light border-b-2 border-metric-gray-medium">
+                                            <th className="px-4 py-3 text-left font-bold text-metric-blue">ID</th>
+                                            <th className="px-4 py-3 text-left font-bold text-metric-blue">Cliente</th>
+                                            <th className="px-4 py-3 text-left font-bold text-metric-blue">Data Criação</th>
+                                            <th className="px-4 py-3 text-left font-bold text-metric-blue">Modificação</th>
+                                            <th className="px-4 py-3 text-center font-bold text-metric-blue">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {orcamentos.map(orc => (
+                                            <tr key={orc.id} className="border-b hover:bg-metric-gray-light transition-colors">
+                                                <td className="px-4 py-3 font-bold text-metric-blue">#{orc.id}</td>
+                                                <td className="px-4 py-3">{orc.cliente.nome}</td>
+                                                <td className="px-4 py-3 text-sm text-metric-gray-medium">{orc.dataCriacao}</td>
+                                                <td className="px-4 py-3 text-sm text-metric-gray-medium">{orc.dataModificacao}</td>
+                                                <td className="px-4 py-3 text-center space-x-2">
+                                                    <button
+                                                        onClick={() => carregarOrcamento(orc)}
+                                                        className="bg-metric-blue text-white px-3 py-1 rounded text-sm font-bold hover:bg-opacity-90"
+                                                    >
+                                                        📝 Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deletarOrcamento(orc.id)}
+                                                        className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-opacity-90"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ABA DE MODELOS */}
+                {abaAtiva === 'modelos' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                        
+                        <div className="lg:col-span-1">
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-metric-orange mb-4 flex items-center gap-2">
+                                    ➕ Novo Modelo
+                                </h2>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                            Nome do Modelo *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={novoModelo.nome}
+                                            onChange={(e) => setNovoModelo({...novoModelo, nome: e.target.value})}
+                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                            placeholder="Ex: Janela Correr Branca"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                            Foto do Modelo
+                                        </label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFotoModelo}
+                                            className="w-full px-2 py-2 border-2 border-metric-gray-medium rounded-lg cursor-pointer text-sm"
+                                        />
+                                    </div>
+
+                                    {novoModelo.foto && (
+                                        <div>
+                                            <img 
+                                                src={novoModelo.foto} 
+                                                alt="Preview" 
+                                                className="w-full h-40 object-cover rounded-lg border-2 border-metric-orange"
+                                            />
+                                        </div>
+                                    )}
+                                    
+                                    <button
+                                        onClick={adicionarModelo}
+                                        className="w-full bg-metric-orange text-white py-2 rounded-lg font-bold hover:bg-opacity-90 transition-all"
+                                    >
+                                        ✅ Salvar Modelo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2">
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-metric-blue mb-4">
+                                    📚 Modelos Salvos
+                                </h2>
+                                
+                                {modelos.length === 0 ? (
+                                    <p className="text-metric-gray-medium text-center py-8">
+                                        Nenhum modelo criado ainda.
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {modelos.map(modelo => (
+                                            <div key={modelo.id} className="border-2 border-metric-gray-light rounded-lg p-3">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h3 className="font-bold text-metric-black-soft">
+                                                        {modelo.nome}
+                                                    </h3>
+                                                    <button
+                                                        onClick={() => deletarModelo(modelo.id)}
+                                                        className="text-red-600 hover:text-red-800 text-lg"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                                
+                                                {modelo.foto && (
+                                                    <img 
+                                                        src={modelo.foto} 
+                                                        alt={modelo.nome} 
+                                                        className="w-full h-24 object-cover rounded-lg"
+                                                    />
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                )}
+
+                {/* ABA DE ORÇAMENTO */}
+                {abaAtiva === 'orcamento' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        
+                        <div className="lg:col-span-2 space-y-6">
+                            
+                           {/* ID DO ORÇAMENTO */}
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-metric-blue mb-4">
+                                    🔢 ID do Orçamento
+                                </h2>
+                                <input
+                                    type="text"
+                                    value={orcamentoID}
+                                    onChange={(e) => setOrcamentoID(e.target.value.toUpperCase())}
+                                    className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none text-2xl font-bold text-center"
+                                    placeholder="Ex: 460"
+                                />
+                                <p className="text-xs text-metric-gray-medium mt-2 text-center">
+                                    Este ID aparecerá no PDF como: ORÇAMENTO 460
+                                </p>
+                            </div>
+                            {/* BOTÕES DE AÇÃO */}
+                            <div className="flex gap-2 flex-wrap">
+                                <button
+                                    onClick={salvarOrcamento}
+                                    className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-all shadow-lg"
+                                >
+                                    💾 Salvar Orçamento
+                                </button>
+                                <button
+                                    onClick={novoOrcamento}
+                                    className="bg-metric-blue text-white px-6 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-all shadow-lg"
+                                >
+                                    ➕ Novo Orçamento
+                                </button>
+                            </div>
+                            
+                            {/* UPLOAD DE LOGO */}
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-metric-blue mb-4 flex items-center gap-2">
+                                    🖼️ Logo da Empresa
+                                </h2>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleLogoUpload}
+                                    className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg cursor-pointer"
+                                />
+                                {logo && (
+                                    <p className="text-sm text-green-600 mt-2">✅ Logo carregada!</p>
+                                )}
+                            </div>
+
+                            {/* DADOS DO CLIENTE */}
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-metric-blue mb-4 flex items-center gap-2">
+                                    👤 Dados do Cliente
+                                </h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                            Nome Completo *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={cliente.nome}
+                                            onChange={(e) => setCliente({...cliente, nome: e.target.value})}
+                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                            placeholder="Ex: Maria Silva"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                            Morada *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={cliente.morada}
+                                            onChange={(e) => setCliente({...cliente, morada: e.target.value})}
+                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                            placeholder="Ex: Rua das Flores, 123"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                Contacto *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={cliente.contacto}
+                                                onChange={(e) => setCliente({...cliente, contacto: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                placeholder="+351 912 345 678"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                NIF
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={cliente.nif}
+                                                onChange={(e) => setCliente({...cliente, nif: e.target.value})}
+                                                className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                placeholder="123456789"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* JANELAS */}
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-metric-blue flex items-center gap-2">
+                                        🪟 Janelas ({janelas.length})
+                                    </h2>
+                                    <button
+                                        onClick={adicionarJanela}
+                                        className="bg-metric-orange text-white px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90"
+                                    >
+                                        + Adicionar
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {janelas.map((janela, index) => (
+                                        <div key={janela.id} className="border-2 border-metric-gray-light rounded-lg p-4">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h3 className="font-bold text-metric-black-soft">
+                                                    Janela #{index + 1}
+                                                </h3>
+                                                {janelas.length > 1 && (
+                                                    <button
+                                                        onClick={() => removerJanela(janela.id)}
+                                                        className="text-red-600 hover:text-red-800 font-semibold"
+                                                    >
+                                                        🗑️ Remover
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {modelos.length > 0 && (
+                                                <div className="mb-4">
+                                                    <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                        Usar Modelo
+                                                    </label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {modelos.map(modelo => (
+                                                            <button
+                                                                key={modelo.id}
+                                                                onClick={() => usarModelo(modelo.id, janela.id)}
+                                                                className={`p-2 rounded-lg border-2 transition-all text-xs font-semibold ${
+                                                                    janela.modelo?.id === modelo.id
+                                                                        ? 'border-metric-orange bg-metric-orange text-white'
+                                                                        : 'border-metric-gray-medium hover:border-metric-orange'
+                                                                }`}
+                                                            >
+                                                                {modelo.nome}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                        Descrição *
+                                                    </label>
+                                                    <textarea
+                                                        value={janela.descricao}
+                                                        onChange={(e) => atualizarJanela(janela.id, 'descricao', e.target.value)}
+                                                        className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none resize-none"
+                                                        rows="2"
+                                                        placeholder="Ex: Janela de Correr - 2000x1500mm - Antracite"
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                            Quantidade
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            step="1"
+                                                            value={janela.quantidade}
+                                                            onChange={(e) => atualizarJanela(janela.id, 'quantidade', e.target.value)}
+                                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                            placeholder="1"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                            Percentual Extra
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={janela.percentualExtra}
+                                                            onChange={(e) => atualizarJanela(janela.id, 'percentualExtra', e.target.value)}
+                                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-3">
+                                                    <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                        Acabamentos (clique para adicionar %)
+                                                    </label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button
+                                                            onClick={() => atualizarJanela(janela.id, 'percentualExtra', janela.percentualExtra === 15 ? 0 : 15)}
+                                                            className={`py-2 px-3 rounded-lg font-bold text-sm transition-all ${
+                                                                janela.percentualExtra === 15
+                                                                    ? 'bg-blue-600 text-white shadow-lg'
+                                                                    : 'bg-metric-gray-light border-2 border-metric-gray-medium hover:border-blue-600'
+                                                            }`}
+                                                        >
+                                                            🎨 Colorida 1 Face (+15%)
+                                                        </button>
+                                                        <button
+                                                            onClick={() => atualizarJanela(janela.id, 'percentualExtra', janela.percentualExtra === 20 ? 0 : 20)}
+                                                            className={`py-2 px-3 rounded-lg font-bold text-sm transition-all ${
+                                                                janela.percentualExtra === 20
+                                                                    ? 'bg-purple-600 text-white shadow-lg'
+                                                                    : 'bg-metric-gray-light border-2 border-metric-gray-medium hover:border-purple-600'
+                                                            }`}
+                                                        >
+                                                            🎨 Colorido 2 Faces (+20%)
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                            Preço Janela (€) *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={janela.preco}
+                                                            onChange={(e) => atualizarJanela(janela.id, 'preco', e.target.value)}
+                                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                            placeholder="450.00"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                            Montagem (€) *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={janela.precoMontagem}
+                                                            onChange={(e) => atualizarJanela(janela.id, 'precoMontagem', e.target.value)}
+                                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                            placeholder="50.00"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                                            Desconto (%)
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={janela.desconto}
+                                                            onChange={(e) => atualizarJanela(janela.id, 'desconto', e.target.value)}
+                                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
+                                                            placeholder="5"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <div className="w-full px-4 py-2 bg-metric-gray-light border-2 border-metric-orange rounded-lg font-bold text-metric-blue text-lg">
+                                                        Subtotal: {formatarMoeda(calcularPrecoJanela(janela.preco, janela.precoMontagem, janela.desconto, janela.percentualExtra, janela.quantidade))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* CONDIÇÕES */}
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-metric-blue mb-4">
+                                    📋 Condições de Fornecimento
+                                </h2>
+                                <textarea
+                                    value={condicoesFornecimento}
+                                    onChange={(e) => setCondicoesFornecimento(e.target.value)}
+                                    className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none resize-none"
+                                    rows="10"
+                                />
+                            </div>
+
+                        </div>
+
+                        {/* COLUNA DIREITA - RESUMO */}
+                        <div className="lg:col-span-1">
+                            <div className="bg-white rounded-xl shadow-lg p-6 sticky top-4">
+                                <h2 className="text-xl font-bold text-metric-blue mb-4">
+                                    📊 Resumo
+                                </h2>
+
+                                <div className="space-y-3 text-sm">
+                                    
+                                    <div className="border-t pt-3"></div>
+
+                                    <div className="flex justify-between">
+                                        <span className="text-metric-black-soft font-bold">Total (sem IVA):</span>
+                                        <span className="font-bold">{formatarMoeda(totalSemIVA)}</span>
+                                    </div>
+
+                                    <div className="border-t pt-3"></div>
+
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-metric-gray-medium">IVA Produto (23%):</span>
+                                        <span className="text-metric-gray-medium">{formatarMoeda(ivaProduto)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-metric-gray-medium">IVA Montagem (6%):</span>
+                                        <span className="text-metric-gray-medium">{formatarMoeda(ivaMontagem)}</span>
+                                    </div>
+
+                                    <div className="bg-metric-blue text-white p-4 rounded-lg mt-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold">TOTAL:</span>
+                                            <span className="font-bold text-2xl">{formatarMoeda(totalComIVA)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={gerarPDF}
+                                    className="w-full mt-6 bg-metric-orange text-white py-3 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all shadow-lg"
+                                >
+                                    📄 Gerar PDF
+                                </button>
+
+                                <button 
+                                    onClick={salvarOrcamento}
+                                    className="w-full mt-3 bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all shadow-lg"
+                                >
+                                    💾 Salvar
+                                </button>
+
+                                <div className="mt-4 text-xs text-metric-gray-medium space-y-1">
+                                    <p>✓ Montagem embutida</p>
+                                    <p>✓ IVAs separados</p>
+                                    <p>✓ Base de dados</p>
+                                    <p>✓ Histórico</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                )}
+
+            </div>
+        </div>
+    )
+}
+
+export default App
