@@ -6,6 +6,7 @@ import { carregarLogo, salvarLogo, carregarModelos, salvarModelo, deletarModelo 
 import { fazerLogin, fazerLogout, verificarUsuarioLogado } from './config/auth'
 
 function App() {
+    
     // Estados principais
         // Estados de autenticação
     const [usuarioLogado, setUsuarioLogado] = useState(null)
@@ -662,6 +663,185 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         
         doc.save(nomeArquivo)
     }
+    // ========== VERIFICAR AUTENTICAÇÃO ==========
+    useEffect(() => {
+        const unsubscribe = verificarUsuarioLogado((user) => {
+            setUsuarioLogado(user)
+            setCarregandoAuth(false)
+        })
+        
+        return () => unsubscribe()
+    }, [])
+    
+    // ========== FUNÇÕES DE LOGIN/LOGOUT ==========
+    const handleLogin = async (e) => {
+        e.preventDefault()
+        const resultado = await fazerLogin(email, senha)
+        
+        if (resultado.sucesso) {
+            alert('✅ Login realizado com sucesso!')
+        } else {
+            alert(`❌ ${resultado.erro}`)
+        }
+    }
+    
+   const handleLogout = async () => {
+    if (window.confirm('Tem certeza que deseja sair?')) {
+        const resultado = await fazerLogout()
+        if (resultado) {
+            setUsuarioLogado(null)  // ← ADICIONE ESTA LINHA
+            alert('✅ Logout realizado!')
+        } else {
+            alert('❌ Erro ao fazer logout')
+        }
+    }
+}
+    
+    // ========== TELA DE CARREGAMENTO DE AUTENTICAÇÃO ==========
+    if (carregandoAuth) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                fontSize: '24px',
+                flexDirection: 'column',
+                gap: '20px',
+                backgroundColor: '#f0f4f8'
+            }}>
+                <div style={{ fontSize: '48px' }}>🔐</div>
+                <div style={{ fontWeight: 'bold', color: '#002a4d' }}>
+                    Verificando autenticação...
+                </div>
+            </div>
+        )
+    }
+    
+    // ========== TELA DE LOGIN ==========
+    if (!usuarioLogado) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: '100vh',
+                backgroundColor: '#f0f4f8',
+                padding: '20px'
+            }}>
+                <div style={{
+                    backgroundColor: 'white',
+                    padding: '40px',
+                    borderRadius: '20px',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                    maxWidth: '400px',
+                    width: '100%'
+                }}>
+                    <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                        <div style={{ fontSize: '64px', marginBottom: '20px' }}>🪟</div>
+                        <h1 style={{ 
+                            color: '#002a4d', 
+                            fontSize: '28px', 
+                            fontWeight: 'bold',
+                            marginBottom: '10px'
+                        }}>
+                            METRIC WINDOWS PT
+                        </h1>
+                        <p style={{ color: '#666', fontSize: '14px' }}>
+                            Sistema de Orçamentação
+                        </p>
+                    </div>
+                    
+                    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div>
+                            <label style={{ 
+                                display: 'block', 
+                                fontWeight: 'bold', 
+                                color: '#002a4d',
+                                marginBottom: '8px',
+                                fontSize: '14px'
+                            }}>
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                                placeholder="seu@email.com"
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    border: '2px solid #ddd',
+                                    borderRadius: '8px',
+                                    fontSize: '16px',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+                        
+                        <div>
+                            <label style={{ 
+                                display: 'block', 
+                                fontWeight: 'bold', 
+                                color: '#002a4d',
+                                marginBottom: '8px',
+                                fontSize: '14px'
+                            }}>
+                                Senha
+                            </label>
+                            <input
+                                type="password"
+                                value={senha}
+                                onChange={(e) => setSenha(e.target.value)}
+                                required
+                                placeholder="••••••••"
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    border: '2px solid #ddd',
+                                    borderRadius: '8px',
+                                    fontSize: '16px',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+                        
+                        <button
+                            type="submit"
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                backgroundColor: '#002a4d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                marginTop: '10px'
+                            }}
+                        >
+                            🔐 Entrar
+                        </button>
+                    </form>
+                    
+                    <div style={{ 
+                        marginTop: '30px', 
+                        padding: '15px', 
+                        backgroundColor: '#fff3cd',
+                        border: '1px solid #ffc107',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        color: '#856404'
+                    }}>
+                        <strong>⚠️ Primeira vez?</strong><br/>
+                        Você precisa criar um usuário no Firebase Console primeiro!
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     // ========== TELA DE CARREGAMENTO ==========
     if (carregando) {
@@ -693,8 +873,26 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             <div className="max-w-7xl mx-auto">
                 
                 {/* CABEÇALHO */}
-                <div className="bg-metric-blue rounded-2xl shadow-2xl p-8 mb-8 text-center">
-                    {logo && (
+{/* CABEÇALHO */}
+<div className="bg-metric-blue rounded-2xl shadow-2xl p-8 mb-8 text-center relative">
+    <button
+        onClick={handleLogout}
+        style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#ff6b35',
+            color: 'white',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontSize: '14px'
+        }}
+    >
+        🚪 Sair
+    </button>                    {logo && (
                         <img 
                             src={logo} 
                             alt="Logo" 
