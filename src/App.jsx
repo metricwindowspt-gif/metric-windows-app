@@ -19,6 +19,7 @@ function App() {
     const [modelos, setModelos] = useState([])
     const [orcamentos, setOrcamentos] = useState([])
     const [carregando, setCarregando] = useState(true)
+    const [salvando, setSalvando] = useState(false)
     const [orcamentoID, setOrcamentoID] = useState('')
     const [cliente, setCliente] = useState({
         nome: '',
@@ -28,6 +29,7 @@ function App() {
     })
     const [novoModelo, setNovoModelo] = useState({
         nome: '',
+        descricao: '', // ← NOVO CAMPO
         foto: null
     })
     const [janelas, setJanelas] = useState([
@@ -145,6 +147,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             const modelo = {
                 id: Date.now(),
                 nome: novoModelo.nome,
+                descricao: novoModelo.descricao || '', // ← SALVAR DESCRIÇÃO
                 foto: novoModelo.foto,
                 dataCriacao: new Date().toISOString()
             }
@@ -155,7 +158,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             const modelosAtualizados = await carregarModelos()
             setModelos(modelosAtualizados)
             
-            setNovoModelo({ nome: '', foto: null })
+            setNovoModelo({ nome: '', descricao: '', foto: null }) // ← LIMPAR DESCRIÇÃO
             alert(`✅ Modelo "${modelo.nome}" adicionado com sucesso!`)
         } catch (error) {
             console.error('❌ Erro ao adicionar modelo:', error)
@@ -244,79 +247,89 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         ))
     }
 
+    // ========== FUNÇÃO: USAR MODELO (ATUALIZADA) ==========
     const usarModelo = (id, janelaId) => {
         const modelo = modelos.find(m => m.id === id)
         if (modelo) {
-            atualizarJanela(janelaId, 'modelo', modelo)
+            // Atualiza o modelo E a descrição da janela
+            setJanelas(janelas.map(j => 
+                j.id === janelaId 
+                    ? { 
+                        ...j, 
+                        modelo: modelo,
+                        descricao: modelo.descricao || j.descricao // ← PREENCHE DESCRIÇÃO
+                    } 
+                    : j
+            ))
         }
     }
 
-// ========== FUNÇÃO: SALVAR ORÇAMENTO ==========
-const salvarOrcamento = async () => {
-    if (!cliente.nome.trim()) {
-        alert('Por favor, preencha o nome do cliente!')
-        return
-    }
-
-    if (!orcamentoID.trim()) {
-        alert('Por favor, preencha o ID do Orçamento!')
-        return
-    }
-
-    try {
-        console.log('🔄 Preparando orçamento para salvar...')
-
-        const janelasLeves = janelas.map(j => ({
-            id: j.id,
-            descricao: j.descricao,
-            preco: parseFloat(j.preco || 0),
-            precoMontagem: parseFloat(j.precoMontagem || 0),
-            desconto: parseFloat(j.desconto || 0),
-            quantidade: parseFloat(j.quantidade || 1),
-            percentualExtra: parseFloat(j.percentualExtra || 0),
-            modeloId: j.modelo?.id || null,
-            modeloNome: j.modelo?.nome || null
-        }))
-
-        const novoOrcamento = {
-            id: orcamentoID, // USAR SEMPRE O ID DO INPUT
-            dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
-            dataModificacao: new Date().toLocaleDateString('pt-PT'),
-            cliente: {
-                nome: cliente.nome,
-                morada: cliente.morada,
-                contacto: cliente.contacto,
-                nif: cliente.nif
-            },
-            janelas: janelasLeves,
-            condicoesFornecimento: condicoesFornecimento.substring(0, 5000),
-            temLogo: logo ? true : false
+    // ========== FUNÇÃO: SALVAR ORÇAMENTO ==========
+    const salvarOrcamento = async () => {
+        if (!cliente.nome.trim()) {
+            alert('Por favor, preencha o nome do cliente!')
+            return
         }
 
-        console.log('🔄 Salvando orçamento no Firebase...', novoOrcamento.id)
-        console.log('📊 Tamanho dos dados:', JSON.stringify(novoOrcamento).length, 'caracteres')
+        if (!orcamentoID.trim()) {
+            alert('Por favor, preencha o ID do Orçamento!')
+            return
+        }
 
-        // SALVAR NO FIREBASE
-        await salvarOrcamentoDB(novoOrcamento)
-        console.log('✅ Orçamento salvo no Firebase!')
+        try {
+            setSalvando(true)
+            console.log('🔄 Preparando orçamento para salvar...')
 
-        // RECARREGAR LISTA DO FIREBASE
-        console.log('🔄 Recarregando lista de orçamentos do Firebase...')
-        const orcamentosAtualizados = await carregarOrcamentos()
-        setOrcamentos(orcamentosAtualizados)
-        console.log(`✅ ${orcamentosAtualizados.length} orçamentos recarregados do Firebase!`)
+            const janelasLeves = janelas.map(j => ({
+                id: j.id,
+                descricao: j.descricao,
+                preco: parseFloat(j.preco || 0),
+                precoMontagem: parseFloat(j.precoMontagem || 0),
+                desconto: parseFloat(j.desconto || 0),
+                quantidade: parseFloat(j.quantidade || 1),
+                percentualExtra: parseFloat(j.percentualExtra || 0),
+                modeloId: j.modelo?.id || null,
+                modeloNome: j.modelo?.nome || null
+            }))
 
-        // ATUALIZAR ESTADO ATUAL
-        setOrcamentoAtual(novoOrcamento)
+            const novoOrcamento = {
+                id: orcamentoID,
+                dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
+                dataModificacao: new Date().toLocaleDateString('pt-PT'),
+                cliente: {
+                    nome: cliente.nome,
+                    morada: cliente.morada,
+                    contacto: cliente.contacto,
+                    nif: cliente.nif
+                },
+                janelas: janelasLeves,
+                condicoesFornecimento: condicoesFornecimento.substring(0, 5000),
+                temLogo: logo ? true : false
+            }
 
-        alert(`✅ Orçamento #${novoOrcamento.id} salvo com sucesso!`)
+            console.log('🔄 Salvando orçamento no Firebase...', novoOrcamento.id)
+            console.log('📊 Tamanho dos dados:', JSON.stringify(novoOrcamento).length, 'caracteres')
 
-    } catch (error) {
-        console.error('❌ Erro ao salvar orçamento:', error)
-        console.error('❌ Detalhes do erro:', error.message)
-        alert('Erro ao salvar orçamento: ' + error.message)
+            await salvarOrcamentoDB(novoOrcamento)
+            console.log('✅ Orçamento salvo no Firebase!')
+
+            console.log('🔄 Recarregando lista de orçamentos do Firebase...')
+            const orcamentosAtualizados = await carregarOrcamentos()
+            setOrcamentos(orcamentosAtualizados)
+            console.log(`✅ ${orcamentosAtualizados.length} orçamentos recarregados do Firebase!`)
+
+            setOrcamentoAtual(novoOrcamento)
+
+            alert(`✅ Orçamento #${novoOrcamento.id} salvo com sucesso!`)
+
+        } catch (error) {
+            console.error('❌ Erro ao salvar orçamento:', error)
+            console.error('❌ Detalhes do erro:', error.message)
+            alert('Erro ao salvar orçamento: ' + error.message)
+        } finally {
+            setSalvando(false)
+        }
     }
-}
 
     // ========== FUNÇÃO: CARREGAR ORÇAMENTO ==========
     const carregarOrcamento = (orcamento) => {
@@ -836,6 +849,20 @@ const salvarOrcamento = async () => {
                                         />
                                     </div>
 
+                                    {/* ← NOVO CAMPO DE DESCRIÇÃO */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-metric-black-soft mb-2">
+                                            Descrição do Modelo
+                                        </label>
+                                        <textarea
+                                            value={novoModelo.descricao}
+                                            onChange={(e) => setNovoModelo({...novoModelo, descricao: e.target.value})}
+                                            className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none resize-none"
+                                            rows="3"
+                                            placeholder="Ex: Janela de Correr - 2000x1500mm - Antracite"
+                                        />
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-semibold text-metric-black-soft mb-2">
                                             Foto do Modelo
@@ -883,12 +910,20 @@ const salvarOrcamento = async () => {
                                         {modelos.map(modelo => (
                                             <div key={modelo.id} className="border-2 border-metric-gray-light rounded-lg p-3">
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <h3 className="font-bold text-metric-black-soft">
-                                                        {modelo.nome}
-                                                    </h3>
+                                                    <div className="flex-1">
+                                                        <h3 className="font-bold text-metric-black-soft">
+                                                            {modelo.nome}
+                                                        </h3>
+                                                        {/* ← EXIBIR DESCRIÇÃO */}
+                                                        {modelo.descricao && (
+                                                            <p className="text-xs text-metric-gray-medium mt-1">
+                                                                {modelo.descricao}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         onClick={() => deletarModelo(modelo.id)}
-                                                        className="text-red-600 hover:text-red-800 text-lg"
+                                                        className="text-red-600 hover:text-red-800 text-lg ml-2"
                                                     >
                                                         🗑️
                                                     </button>
@@ -935,9 +970,14 @@ const salvarOrcamento = async () => {
                             <div className="flex gap-2 flex-wrap">
                                 <button
                                     onClick={salvarOrcamento}
-                                    className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-all shadow-lg"
+                                    disabled={salvando}
+                                    className={`text-white px-6 py-3 rounded-lg font-bold transition-all shadow-lg ${
+                                        salvando 
+                                            ? 'bg-gray-400 cursor-not-allowed' 
+                                            : 'bg-green-600 hover:bg-opacity-90'
+                                    }`}
                                 >
-                                    💾 Salvar Orçamento
+                                    {salvando ? '⏳ Salvando...' : '💾 Salvar Orçamento'}
                                 </button>
                                 <button
                                     onClick={novoOrcamento}
@@ -1053,7 +1093,7 @@ const salvarOrcamento = async () => {
                                             {modelos.length > 0 && (
                                                 <div className="mb-4">
                                                     <label className="block text-sm font-semibold text-metric-black-soft mb-2">
-                                                        Usar Modelo
+                                                        Usar Modelo (clique para preencher descrição)
                                                     </label>
                                                     <div className="grid grid-cols-3 gap-2">
                                                         {modelos.map(modelo => (
@@ -1076,7 +1116,7 @@ const salvarOrcamento = async () => {
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="block text-sm font-semibold text-metric-black-soft mb-2">
-                                                        Descrição *
+                                                        Descrição * (editável)
                                                     </label>
                                                     <textarea
                                                         value={janela.descricao}
@@ -1248,9 +1288,14 @@ const salvarOrcamento = async () => {
 
                                 <button
                                     onClick={salvarOrcamento}
-                                    className="w-full mt-3 bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all shadow-lg"
+                                    disabled={salvando}
+                                    className={`w-full mt-3 text-white py-3 rounded-lg font-bold text-lg transition-all shadow-lg ${
+                                        salvando 
+                                            ? 'bg-gray-400 cursor-not-allowed' 
+                                            : 'bg-green-600 hover:bg-opacity-90'
+                                    }`}
                                 >
-                                    💾 Salvar
+                                    {salvando ? '⏳ Salvando...' : '💾 Salvar'}
                                 </button>
 
                                 <div className="mt-4 text-xs text-metric-gray-medium space-y-1">
