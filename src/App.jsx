@@ -251,78 +251,72 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         }
     }
 
-    // ========== FUNÇÃO: SALVAR ORÇAMENTO ==========
-    const salvarOrcamento = async () => {
-        if (!cliente.nome.trim()) {
-            alert('Por favor, preencha o nome do cliente!')
-            return
-        }
-
-        if (!orcamentoID.trim()) {
-            alert('Por favor, preencha o ID do Orçamento!')
-            return
-        }
-
-        try {
-            console.log('🔄 Preparando orçamento para salvar...')
-
-            const janelasLeves = janelas.map(j => ({
-                id: j.id,
-                descricao: j.descricao,
-                preco: parseFloat(j.preco || 0),
-                precoMontagem: parseFloat(j.precoMontagem || 0),
-                desconto: parseFloat(j.desconto || 0),
-                quantidade: parseFloat(j.quantidade || 1),
-                percentualExtra: parseFloat(j.percentualExtra || 0),
-                modeloId: j.modelo?.id || null,
-                modeloNome: j.modelo?.nome || null
-            }))
-
-            const novoOrcamento = {
-                id: orcamentoAtual?.id || orcamentoID,
-                dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
-                dataModificacao: new Date().toLocaleDateString('pt-PT'),
-                cliente: {
-                    nome: cliente.nome,
-                    morada: cliente.morada,
-                    contacto: cliente.contacto,
-                    nif: cliente.nif
-                },
-                janelas: janelasLeves,
-                condicoesFornecimento: condicoesFornecimento.substring(0, 5000),
-                temLogo: logo ? true : false
-            }
-
-            console.log('🔄 Salvando orçamento no Firebase...', novoOrcamento.id)
-            console.log('📊 Tamanho dos dados:', JSON.stringify(novoOrcamento).length, 'caracteres')
-
-            await salvarOrcamentoDB(novoOrcamento)
-            console.log('✅ Orçamento salvo no Firebase!')
-
-            if (orcamentoAtual) {
-                const updatedOrcamentos = orcamentos.map(o =>
-                    o.id === novoOrcamento.id ? novoOrcamento : o
-                )
-                setOrcamentos(updatedOrcamentos)
-                alert(`✅ Orçamento #${novoOrcamento.id} atualizado com sucesso!`)
-            } else {
-                const novosOrcamentos = [...orcamentos, novoOrcamento]
-                setOrcamentos(novosOrcamentos)
-                setOrcamentoAtual(novoOrcamento)
-                alert(`✅ Orçamento #${novoOrcamento.id} criado com sucesso!`)
-            }
-
-            console.log('🔄 Recarregando lista de orçamentos...')
-            const orcamentosAtualizados = await carregarOrcamentos()
-            setOrcamentos(orcamentosAtualizados)
-            console.log(`✅ ${orcamentosAtualizados.length} orçamentos recarregados!`)
-
-        } catch (error) {
-            console.error('❌ Erro ao salvar orçamento:', error)
-            console.error('❌ Detalhes do erro:', error.message)
-            alert('Erro ao salvar orçamento: ' + error.message)
-        }
+// ========== FUNÇÃO: SALVAR ORÇAMENTO ==========
+const salvarOrcamento = async () => {
+    if (!cliente.nome.trim()) {
+        alert('Por favor, preencha o nome do cliente!')
+        return
     }
+
+    if (!orcamentoID.trim()) {
+        alert('Por favor, preencha o ID do Orçamento!')
+        return
+    }
+
+    try {
+        console.log('🔄 Preparando orçamento para salvar...')
+
+        const janelasLeves = janelas.map(j => ({
+            id: j.id,
+            descricao: j.descricao,
+            preco: parseFloat(j.preco || 0),
+            precoMontagem: parseFloat(j.precoMontagem || 0),
+            desconto: parseFloat(j.desconto || 0),
+            quantidade: parseFloat(j.quantidade || 1),
+            percentualExtra: parseFloat(j.percentualExtra || 0),
+            modeloId: j.modelo?.id || null,
+            modeloNome: j.modelo?.nome || null
+        }))
+
+        const novoOrcamento = {
+            id: orcamentoID, // USAR SEMPRE O ID DO INPUT
+            dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
+            dataModificacao: new Date().toLocaleDateString('pt-PT'),
+            cliente: {
+                nome: cliente.nome,
+                morada: cliente.morada,
+                contacto: cliente.contacto,
+                nif: cliente.nif
+            },
+            janelas: janelasLeves,
+            condicoesFornecimento: condicoesFornecimento.substring(0, 5000),
+            temLogo: logo ? true : false
+        }
+
+        console.log('🔄 Salvando orçamento no Firebase...', novoOrcamento.id)
+        console.log('📊 Tamanho dos dados:', JSON.stringify(novoOrcamento).length, 'caracteres')
+
+        // SALVAR NO FIREBASE
+        await salvarOrcamentoDB(novoOrcamento)
+        console.log('✅ Orçamento salvo no Firebase!')
+
+        // RECARREGAR LISTA DO FIREBASE
+        console.log('🔄 Recarregando lista de orçamentos do Firebase...')
+        const orcamentosAtualizados = await carregarOrcamentos()
+        setOrcamentos(orcamentosAtualizados)
+        console.log(`✅ ${orcamentosAtualizados.length} orçamentos recarregados do Firebase!`)
+
+        // ATUALIZAR ESTADO ATUAL
+        setOrcamentoAtual(novoOrcamento)
+
+        alert(`✅ Orçamento #${novoOrcamento.id} salvo com sucesso!`)
+
+    } catch (error) {
+        console.error('❌ Erro ao salvar orçamento:', error)
+        console.error('❌ Detalhes do erro:', error.message)
+        alert('Erro ao salvar orçamento: ' + error.message)
+    }
+}
 
     // ========== FUNÇÃO: CARREGAR ORÇAMENTO ==========
     const carregarOrcamento = (orcamento) => {
