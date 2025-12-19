@@ -2,22 +2,23 @@ import React, { useState, useEffect } from 'react'
 import './styles/index.css'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
-import { carregarLogo, salvarLogo, carregarModelos, salvarModelo, deletarModelo as deletarModeloDB, carregarOrcamentos, salvarOrcamento as salvarOrcamentoDB, deletarOrcamento as deletarOrcamentoDB } from './config/database'
-import { fazerLogin, fazerLogout, verificarUsuarioLogado } from './config/auth'
+import { 
+    carregarLogo, 
+    salvarLogo, 
+    carregarModelos, 
+    salvarModelo as salvarModeloDB, 
+    deletarModelo as deletarModeloDB, 
+    carregarOrcamentos, 
+    salvarOrcamento as salvarOrcamentoDB, 
+    deletarOrcamento as deletarOrcamentoDB 
+} from './config/database'
 
 function App() {
-    
-    // Estados principais
-        // Estados de autenticação
-    const [usuarioLogado, setUsuarioLogado] = useState(null)
-    const [carregandoAuth, setCarregandoAuth] = useState(true)
-    const [email, setEmail] = useState('')
-    const [senha, setSenha] = useState('')
+    // ========== ESTADOS ==========
     const [logo, setLogo] = useState(null)
     const [modelos, setModelos] = useState([])
     const [orcamentos, setOrcamentos] = useState([])
     const [carregando, setCarregando] = useState(true)
-    
     const [orcamentoID, setOrcamentoID] = useState('')
     const [cliente, setCliente] = useState({
         nome: '',
@@ -25,15 +26,13 @@ function App() {
         contacto: '',
         nif: ''
     })
-    
     const [novoModelo, setNovoModelo] = useState({
         nome: '',
         foto: null
     })
-    
     const [janelas, setJanelas] = useState([
         {
-            id: 1,
+            id: Date.now(),
             descricao: '',
             preco: 0,
             precoMontagem: 0,
@@ -43,7 +42,6 @@ function App() {
             modelo: null
         }
     ])
-    
     const [condicoesFornecimento, setCondicoesFornecimento] = useState(
         `FORMA DE PAGAMENTO
 50% ADJUDICAÇÃO
@@ -98,173 +96,95 @@ A Metric Windows PT compromete-se a cumprir os custos e valores definidos na pro
 
 Caso o cliente solicite alterações ao orçamento após a adjudicação, o valor poderá ser ajustado, resultando em aumento ou diminuição do montante inicialmente orçamentado. Todas as alterações deverão ser previamente aprovadas pelo cliente e formalizadas por escrito.`
     )
-    
     const [abaAtiva, setAbaAtiva] = useState('orcamento')
     const [orcamentoAtual, setOrcamentoAtual] = useState(null)
-    
-    // ========== CARREGAR DADOS DO FIREBASE (USEEFFECT) ==========
+
+    // ========== CARREGAR DADOS DO FIREBASE ==========
     useEffect(() => {
         const carregarDadosIniciais = async () => {
             try {
                 setCarregando(true)
                 console.log('🔄 Carregando dados do Firebase...')
-                
-                // Carregar logo
+
                 const logoSalvo = await carregarLogo()
                 if (logoSalvo) {
                     setLogo(logoSalvo)
                     console.log('✅ Logo carregado!')
                 }
-                
-                // Carregar modelos
+
                 const modelosSalvos = await carregarModelos()
                 setModelos(modelosSalvos)
                 console.log(`✅ ${modelosSalvos.length} modelos carregados!`)
-                
-                // Carregar orçamentos
+
                 const orcamentosSalvos = await carregarOrcamentos()
                 setOrcamentos(orcamentosSalvos)
                 console.log(`✅ ${orcamentosSalvos.length} orçamentos carregados!`)
-                
+
                 console.log('✅ Todos os dados carregados do Firebase!')
             } catch (error) {
                 console.error('❌ Erro ao carregar dados:', error)
-                alert('Erro ao carregar dados do Firebase. Verifique a conexão e tente novamente.')
+                alert('Erro ao carregar dados do Firebase. Verifique a conexão.')
             } finally {
                 setCarregando(false)
             }
         }
-        
+
         carregarDadosIniciais()
     }, [])
-    
-    // ========== FUNÇÕES UTILITÁRIAS ==========
-    const gerarID = () => {
-        return Math.random().toString(36).substr(2, 9).toUpperCase()
-    }
-    
-    // ========== FUNÇÕES DE ORÇAMENTO (FIREBASE) ==========
-    const salvarOrcamento = async () => {
-        if (!cliente.nome.trim()) {
-            alert('Por favor, preencha o nome do cliente!')
-            return
-        }
-        
-        if (!orcamentoID.trim()) {
-            alert('Por favor, preencha o ID do Orçamento (ex: 460)!')
-            return
-        }
-        
-        const novoOrcamento = {
-            id: orcamentoAtual?.id || orcamentoID,
-            dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
-            dataModificacao: new Date().toLocaleDateString('pt-PT'),
-            cliente,
-            janelas,
-            condicoesFornecimento,
-            logo
-        }
-        
-        try {
-            await salvarOrcamentoDB(novoOrcamento)
-            
-            if (orcamentoAtual) {
-                const updatedOrcamentos = orcamentos.map(o => 
-                    o.id === novoOrcamento.id ? novoOrcamento : o
-                )
-                setOrcamentos(updatedOrcamentos)
-                alert(`✅ Orçamento #${novoOrcamento.id} atualizado com sucesso!`)
-            } else {
-                const novosOrcamentos = [...orcamentos, novoOrcamento]
-                setOrcamentos(novosOrcamentos)
-                setOrcamentoAtual(novoOrcamento)
-                alert(`✅ Orçamento #${novoOrcamento.id} criado com sucesso!`)
-            }
-        } catch (error) {
-            console.error('❌ Erro ao salvar orçamento:', error)
-            alert('Erro ao salvar orçamento no Firebase. Tente novamente.')
-        }
-    }
-    
-    const carregarOrcamento = (orcamento) => {
-        setCliente(orcamento.cliente)
-        setJanelas(orcamento.janelas)
-        setCondicoesFornecimento(orcamento.condicoesFornecimento)
-        setLogo(orcamento.logo)
-        setOrcamentoAtual(orcamento)
-        setOrcamentoID(orcamento.id)
-        setAbaAtiva('orcamento')
-        alert(`✅ Orçamento #${orcamento.id} carregado! Agora pode editar.`)
-    }
-    
-    const deletarOrcamento = async (id) => {
-        if (window.confirm('Tem a certeza que deseja apagar este orçamento?')) {
-            try {
-                await deletarOrcamentoDB(id)
-                const novosOrcamentos = orcamentos.filter(o => o.id !== id)
-                setOrcamentos(novosOrcamentos)
-                alert('✅ Orçamento apagado!')
-            } catch (error) {
-                console.error('❌ Erro ao deletar orçamento:', error)
-                alert('Erro ao deletar orçamento. Tente novamente.')
-            }
-        }
-    }
-    
-    const novoOrcamento = () => {
-        setCliente({ nome: '', morada: '', contacto: '', nif: '' })
-        setJanelas([{
-            id: 1,
-            descricao: '',
-            preco: 0,
-            precoMontagem: 0,
-            desconto: 0,
-            modelo: null
-        }])
-        setOrcamentoAtual(null)
-        setOrcamentoID('')
-        setAbaAtiva('orcamento')
-    }
-    
-    // ========== FUNÇÕES DE MODELOS (FIREBASE) ==========
+
+    // ========== FUNÇÃO: SALVAR MODELO ==========
     const adicionarModelo = async () => {
         if (!novoModelo.nome.trim()) {
             alert('Por favor, digite o nome do modelo!')
             return
         }
-        
+
         try {
+            console.log('🔄 Salvando modelo...', novoModelo)
+            
             const modelo = {
                 id: Date.now(),
                 nome: novoModelo.nome,
-                foto: novoModelo.foto
+                foto: novoModelo.foto,
+                dataCriacao: new Date().toISOString()
             }
-            
-            await salvarModelo(modelo)
-            
-            const novosModelos = [...modelos, modelo]
-            setModelos(novosModelos)
+
+            await salvarModeloDB(modelo)
+            console.log('✅ Modelo salvo no Firebase!')
+
+            const modelosAtualizados = await carregarModelos()
+            setModelos(modelosAtualizados)
             
             setNovoModelo({ nome: '', foto: null })
-            alert('✅ Modelo adicionado com sucesso!')
+            alert(`✅ Modelo "${modelo.nome}" adicionado com sucesso!`)
         } catch (error) {
             console.error('❌ Erro ao adicionar modelo:', error)
-            alert('Erro ao adicionar modelo. Tente novamente.')
+            alert('Erro ao adicionar modelo: ' + error.message)
         }
     }
-    
+
+    // ========== FUNÇÃO: DELETAR MODELO ==========
     const deletarModelo = async (id) => {
+        if (!window.confirm('Tem a certeza que deseja apagar este modelo?')) {
+            return
+        }
+
         try {
+            console.log('🔄 Deletando modelo...', id)
             await deletarModeloDB(id)
-            const novosModelos = modelos.filter(m => m.id !== id)
-            setModelos(novosModelos)
+            console.log('✅ Modelo deletado!')
+
+            const modelosAtualizados = await carregarModelos()
+            setModelos(modelosAtualizados)
+            
             alert('✅ Modelo deletado com sucesso!')
         } catch (error) {
             console.error('❌ Erro ao deletar modelo:', error)
-            alert('Erro ao deletar modelo. Tente novamente.')
+            alert('Erro ao deletar modelo: ' + error.message)
         }
     }
-    
+
+    // ========== FUNÇÃO: UPLOAD FOTO MODELO ==========
     const handleFotoModelo = (e) => {
         const file = e.target.files[0]
         if (file) {
@@ -275,7 +195,28 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             reader.readAsDataURL(file)
         }
     }
-    
+
+    // ========== FUNÇÃO: SALVAR LOGO ==========
+    const handleLogoUpload = async (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = async () => {
+                try {
+                    console.log('🔄 Salvando logo...')
+                    setLogo(reader.result)
+                    await salvarLogo(reader.result)
+                    console.log('✅ Logo salvo no Firebase!')
+                    alert('✅ Logo salvo com sucesso!')
+                } catch (error) {
+                    console.error('❌ Erro ao salvar logo:', error)
+                    alert('Erro ao salvar logo: ' + error.message)
+                }
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
     // ========== FUNÇÕES DE JANELAS ==========
     const adicionarJanela = () => {
         const novaJanela = {
@@ -290,100 +231,216 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
         }
         setJanelas([...janelas, novaJanela])
     }
-    
+
     const removerJanela = (id) => {
         if (janelas.length > 1) {
             setJanelas(janelas.filter(j => j.id !== id))
         }
     }
-    
+
     const atualizarJanela = (id, campo, valor) => {
-        setJanelas(janelas.map(j => 
+        setJanelas(janelas.map(j =>
             j.id === id ? { ...j, [campo]: valor } : j
         ))
     }
-    
+
     const usarModelo = (id, janelaId) => {
         const modelo = modelos.find(m => m.id === id)
         if (modelo) {
             atualizarJanela(janelaId, 'modelo', modelo)
         }
     }
-    
-    // ========== FUNÇÃO DE LOGO (FIREBASE) ==========
-    const handleLogoUpload = async (e) => {
-        const file = e.target.files[0]
-        if (file) {
-            const reader = new FileReader()
-            reader.onloadend = async () => {
-                try {
-                    setLogo(reader.result)
-                    await salvarLogo(reader.result)
-                    console.log('✅ Logo salvo no Firebase!')
-                    alert('✅ Logo salvo com sucesso!')
-                } catch (error) {
-                    console.error('❌ Erro ao salvar logo:', error)
-                    alert('Erro ao salvar logo. Tente novamente.')
-                }
+
+    // ========== FUNÇÃO: SALVAR ORÇAMENTO ==========
+    const salvarOrcamento = async () => {
+        if (!cliente.nome.trim()) {
+            alert('Por favor, preencha o nome do cliente!')
+            return
+        }
+
+        if (!orcamentoID.trim()) {
+            alert('Por favor, preencha o ID do Orçamento!')
+            return
+        }
+
+        try {
+            console.log('🔄 Preparando orçamento para salvar...')
+
+            const janelasLeves = janelas.map(j => ({
+                id: j.id,
+                descricao: j.descricao,
+                preco: parseFloat(j.preco || 0),
+                precoMontagem: parseFloat(j.precoMontagem || 0),
+                desconto: parseFloat(j.desconto || 0),
+                quantidade: parseFloat(j.quantidade || 1),
+                percentualExtra: parseFloat(j.percentualExtra || 0),
+                modeloId: j.modelo?.id || null,
+                modeloNome: j.modelo?.nome || null
+            }))
+
+            const novoOrcamento = {
+                id: orcamentoAtual?.id || orcamentoID,
+                dataCriacao: orcamentoAtual?.dataCriacao || new Date().toLocaleDateString('pt-PT'),
+                dataModificacao: new Date().toLocaleDateString('pt-PT'),
+                cliente: {
+                    nome: cliente.nome,
+                    morada: cliente.morada,
+                    contacto: cliente.contacto,
+                    nif: cliente.nif
+                },
+                janelas: janelasLeves,
+                condicoesFornecimento: condicoesFornecimento.substring(0, 5000),
+                temLogo: logo ? true : false
             }
-            reader.readAsDataURL(file)
+
+            console.log('🔄 Salvando orçamento no Firebase...', novoOrcamento.id)
+            console.log('📊 Tamanho dos dados:', JSON.stringify(novoOrcamento).length, 'caracteres')
+
+            await salvarOrcamentoDB(novoOrcamento)
+            console.log('✅ Orçamento salvo no Firebase!')
+
+            if (orcamentoAtual) {
+                const updatedOrcamentos = orcamentos.map(o =>
+                    o.id === novoOrcamento.id ? novoOrcamento : o
+                )
+                setOrcamentos(updatedOrcamentos)
+                alert(`✅ Orçamento #${novoOrcamento.id} atualizado com sucesso!`)
+            } else {
+                const novosOrcamentos = [...orcamentos, novoOrcamento]
+                setOrcamentos(novosOrcamentos)
+                setOrcamentoAtual(novoOrcamento)
+                alert(`✅ Orçamento #${novoOrcamento.id} criado com sucesso!`)
+            }
+
+            console.log('🔄 Recarregando lista de orçamentos...')
+            const orcamentosAtualizados = await carregarOrcamentos()
+            setOrcamentos(orcamentosAtualizados)
+            console.log(`✅ ${orcamentosAtualizados.length} orçamentos recarregados!`)
+
+        } catch (error) {
+            console.error('❌ Erro ao salvar orçamento:', error)
+            console.error('❌ Detalhes do erro:', error.message)
+            alert('Erro ao salvar orçamento: ' + error.message)
         }
     }
-    
+
+    // ========== FUNÇÃO: CARREGAR ORÇAMENTO ==========
+    const carregarOrcamento = (orcamento) => {
+        setCliente(orcamento.cliente)
+
+        const janelasReconstruidas = orcamento.janelas.map(j => {
+            const modeloCompleto = modelos.find(m => m.id === j.modeloId)
+            return {
+                ...j,
+                modelo: modeloCompleto || (j.modeloId ? {
+                    id: j.modeloId,
+                    nome: j.modeloNome,
+                    foto: null
+                } : null)
+            }
+        })
+
+        setJanelas(janelasReconstruidas)
+        setCondicoesFornecimento(orcamento.condicoesFornecimento)
+        setOrcamentoAtual(orcamento)
+        setOrcamentoID(orcamento.id)
+        setAbaAtiva('orcamento')
+        alert(`✅ Orçamento #${orcamento.id} carregado!`)
+    }
+
+    // ========== FUNÇÃO: DELETAR ORÇAMENTO ==========
+    const deletarOrcamento = async (id) => {
+        if (!window.confirm('Tem a certeza que deseja apagar este orçamento?')) {
+            return
+        }
+
+        try {
+            console.log('🔄 Deletando orçamento...', id)
+            await deletarOrcamentoDB(id)
+            console.log('✅ Orçamento deletado!')
+
+            const orcamentosAtualizados = await carregarOrcamentos()
+            setOrcamentos(orcamentosAtualizados)
+            
+            alert('✅ Orçamento apagado com sucesso!')
+        } catch (error) {
+            console.error('❌ Erro ao deletar orçamento:', error)
+            alert('Erro ao deletar orçamento: ' + error.message)
+        }
+    }
+
+    // ========== FUNÇÃO: NOVO ORÇAMENTO ==========
+    const novoOrcamento = () => {
+        setCliente({ nome: '', morada: '', contacto: '', nif: '' })
+        setJanelas([{
+            id: Date.now(),
+            descricao: '',
+            preco: 0,
+            precoMontagem: 0,
+            desconto: 0,
+            quantidade: 1,
+            percentualExtra: 0,
+            modelo: null
+        }])
+        setOrcamentoAtual(null)
+        setOrcamentoID('')
+        setAbaAtiva('orcamento')
+    }
+
     // ========== CÁLCULOS ==========
     const calcularPrecoJanela = (preco, precoMontagem, desconto, percentualExtra = 0, quantidade = 1) => {
         const precoJanela = parseFloat(preco || 0)
         const precoMont = parseFloat(precoMontagem || 0)
         const descontoNumerico = parseFloat(desconto || 0)
         const percentualNumerico = parseFloat(percentualExtra || 0)
-        
+
         let precoJanelaFinal = precoJanela * (1 - descontoNumerico / 100)
         precoJanelaFinal = precoJanelaFinal * (1 + percentualNumerico / 100)
-        
+
         let precoMontFinal = precoMont * (1 + percentualNumerico / 100)
-        
+
         const valorFinal = (precoJanelaFinal + precoMontFinal) * parseFloat(quantidade || 1)
-        
+
         return valorFinal
     }
-    
+
     const subtotalJanelas = janelas.reduce((sum, j) => {
         return sum + calcularPrecoJanela(j.preco, j.precoMontagem, j.desconto, j.percentualExtra, j.quantidade)
     }, 0)
     const totalSemIVA = subtotalJanelas
-    
+
     const calcularIVAs = () => {
         let ivaProduto = 0
         let ivaMontagem = 0
-        
+
         janelas.forEach(j => {
             const precoJanela = parseFloat(j.preco || 0)
             const precoMont = parseFloat(j.precoMontagem || 0)
             const desc = parseFloat(j.desconto || 0) / 100
             const percExtra = parseFloat(j.percentualExtra || 0) / 100
             const qtd = parseFloat(j.quantidade || 1)
-            
+
             const precoJanelaFinal = precoJanela * (1 - desc) * (1 + percExtra) * qtd
             const precoMontFinal = precoMont * (1 + percExtra) * qtd
-            
+
             ivaProduto += precoJanelaFinal * 0.23
             ivaMontagem += precoMontFinal * 0.06
         })
-        
+
         return { ivaProduto, ivaMontagem }
     }
-    
+
     const { ivaProduto, ivaMontagem } = calcularIVAs()
     const totalIVA = ivaProduto + ivaMontagem
     const totalComIVA = totalSemIVA + totalIVA
-    
+
     const formatarMoeda = (valor) => {
         return new Intl.NumberFormat('pt-PT', {
             style: 'currency',
             currency: 'EUR'
         }).format(valor)
     }
-    
+
     const getAcabamentoNome = (percentual) => {
         if (percentual === 15) return 'COLORIDA 1 FACE'
         if (percentual === 20) return 'COLORIDA 2 FACES'
@@ -394,8 +451,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
     const gerarPDF = () => {
         const doc = new jsPDF('p', 'mm', 'a4')
         let yPos = 20
-        
-        // 1️⃣ LOGO
+
         if (logo) {
             try {
                 const formato = logo.includes('data:image/png') ? 'PNG' : 'JPEG'
@@ -406,34 +462,32 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                 yPos += 5
             }
         }
-        
-        // 2️⃣ CABEÇALHO
+
         doc.setFillColor(0, 42, 77)
         doc.rect(0, yPos, 210, 20, 'F')
-        
+
         doc.setTextColor(255, 255, 255)
         doc.setFontSize(18)
         doc.setFont(undefined, 'bold')
         doc.text('METRIC WINDOWS PT', 105, yPos + 7, { align: 'center' })
-        
+
         doc.setFontSize(11)
         doc.setFont(undefined, 'normal')
         doc.text(`ORÇAMENTO ${orcamentoAtual?.id || orcamentoID || 'NOVO'}`, 105, yPos + 14, { align: 'center' })
-        
+
         yPos += 25
         doc.setTextColor(0, 0, 0)
-        
-        // 3️⃣ DADOS DO CLIENTE
+
         doc.setFontSize(12)
         doc.setFont(undefined, 'bold')
         doc.setTextColor(0, 42, 77)
         doc.text('DADOS DO CLIENTE', 15, yPos)
         yPos += 6
-        
+
         doc.setFontSize(9)
         doc.setFont(undefined, 'normal')
         doc.setTextColor(0, 0, 0)
-        
+
         if (cliente.nome) {
             doc.text(`Nome: ${cliente.nome}`, 15, yPos)
             yPos += 4
@@ -450,21 +504,20 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             doc.text(`NIF: ${cliente.nif}`, 15, yPos)
             yPos += 4
         }
-        
+
         yPos += 5
-        
-        // 4️⃣ TABELA DE JANELAS
+
         if (yPos > 240) {
             doc.addPage()
             yPos = 20
         }
-        
+
         doc.setFontSize(12)
         doc.setFont(undefined, 'bold')
         doc.setTextColor(0, 42, 77)
         doc.text('JANELAS', 15, yPos)
         yPos += 4
-        
+
         const tabelaJanelas = janelas.map((janela, index) => {
             const precoComDesconto = calcularPrecoJanela(janela.preco, janela.precoMontagem, janela.desconto, janela.percentualExtra, janela.quantidade)
             return [
@@ -477,10 +530,10 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                 formatarMoeda(precoComDesconto)
             ]
         })
-        
+
         doc.autoTable({
             startY: yPos,
-            head: [['Item', 'Descrição', 'Qtd', 'Janela+Montagem', 'Desconto na janela', 'Extra', 'Subtotal']],
+            head: [['Item', 'Descrição', 'Qtd', 'Janela+Montagem', 'Desconto', 'Extra', 'Subtotal']],
             body: tabelaJanelas,
             theme: 'grid',
             headStyles: {
@@ -495,103 +548,77 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             alternateRowStyles: {
                 fillColor: [245, 245, 245]
             },
-            margin: { left: 15, right: 15 },
-            columnStyles: {
-                2: { halign: 'right' },
-                3: { halign: 'center' },
-                4: { halign: 'right' }
-            }
+            margin: { left: 15, right: 15 }
         })
-        
+
         yPos = doc.lastAutoTable.finalY + 8
-        
-        // 5️⃣ MODELOS COM FOTOS
+
         const janelasComFoto = janelas.filter(j => j.modelo?.foto)
-        
+
         if (janelasComFoto.length > 0) {
             if (yPos > 240) {
                 doc.addPage()
                 yPos = 20
             }
-            
+
             doc.setFontSize(12)
             doc.setFont(undefined, 'bold')
             doc.setTextColor(0, 42, 77)
             doc.text('MODELOS SELECIONADOS', 15, yPos)
             yPos += 8
-            
-            janelasComFoto.forEach((janela, index) => {
+
+            janelasComFoto.forEach((janela) => {
                 if (yPos > 235) {
                     doc.addPage()
                     yPos = 20
                 }
-                
+
                 try {
                     doc.addImage(janela.modelo.foto, 'PNG', 15, yPos, 35, 35)
-                    
+
                     doc.setTextColor(0, 0, 0)
                     doc.setFontSize(9)
                     doc.setFont(undefined, 'bold')
                     doc.text(`${janela.modelo.nome}`, 55, yPos + 3)
-                    
+
                     doc.setFontSize(7)
                     doc.setFont(undefined, 'normal')
-                    
+
                     const linhasDescricao = doc.splitTextToSize(janela.descricao, 145)
                     doc.text(linhasDescricao, 55, yPos + 9)
-                    
-                    const proximaLinha = yPos + 9 + (linhasDescricao.length * 3)
-                    
-                    doc.setFont(undefined, 'normal')
-                    doc.setTextColor(0, 0, 0)
-                    const precoTotal = parseFloat(janela.preco || 0) + parseFloat(janela.precoMontagem || 0)
-                    doc.text(`Preço: ${formatarMoeda(precoTotal)}`, 55, proximaLinha + 2)
-                    
-                    let linhaExtra = 0
-                    
-                    if (janela.desconto > 0) {
-                        doc.text(`Desconto: -${janela.desconto}%`, 55, proximaLinha + 6)
-                        linhaExtra = 4
-                    }
-                    
-                    if (janela.percentualExtra > 0) {
-                        doc.text(`Acabamento: ${getAcabamentoNome(janela.percentualExtra)}`, 55, proximaLinha + 6 + linhaExtra)
-                        linhaExtra += 4
-                    }
-                    
+
                     yPos += 42
                 } catch (error) {
                     console.log('Erro ao adicionar foto:', error)
                     yPos += 10
                 }
             })
-            
+
             yPos += 3
         }
-        
-        // 6️⃣ RESUMO FINANCEIRO
+
         if (yPos > 240) {
             doc.addPage()
             yPos = 20
         }
-        
+
         doc.setFontSize(12)
         doc.setFont(undefined, 'bold')
         doc.setTextColor(0, 42, 77)
         doc.text('RESUMO FINANCEIRO', 15, yPos)
         yPos += 5
-        
+
         doc.setFontSize(10)
         doc.setFont(undefined, 'normal')
         doc.setTextColor(0, 0, 0)
-        
+
         const resumoData = [
             ['Total (sem IVA):', formatarMoeda(totalSemIVA)],
             ['', ''],
             ['IVA Produto (23%):', formatarMoeda(ivaProduto)],
             ['IVA Montagem (6%):', formatarMoeda(ivaMontagem)],
         ]
-        
+
         doc.autoTable({
             startY: yPos,
             body: resumoData,
@@ -605,41 +632,38 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             },
             margin: { left: 15, right: 15 }
         })
-        
+
         yPos = doc.lastAutoTable.finalY + 5
-        
-        // TOTAL GERAL
+
         doc.setFillColor(0, 42, 77)
         doc.rect(15, yPos, 180, 10, 'F')
-        
+
         doc.setTextColor(255, 255, 255)
         doc.setFontSize(12)
         doc.setFont(undefined, 'bold')
         doc.text('TOTAL COM IVA:', 18, yPos + 6.5)
         doc.text(formatarMoeda(totalComIVA), 190, yPos + 6.5, { align: 'right' })
-        
+
         yPos += 15
-        
-        // 7️⃣ CONDIÇÕES
+
         if (yPos > 250) {
             doc.addPage()
             yPos = 20
         }
-        
+
         doc.setTextColor(0, 42, 77)
         doc.setFontSize(12)
         doc.setFont(undefined, 'bold')
         doc.text('CONDIÇÕES DE FORNECIMENTO', 15, yPos)
         yPos += 5
-        
+
         doc.setTextColor(0, 0, 0)
         doc.setFontSize(8)
         doc.setFont(undefined, 'normal')
-        
+
         const condicoesLinhas = doc.splitTextToSize(condicoesFornecimento, 180)
         doc.text(condicoesLinhas, 15, yPos)
-        
-        // RODAPÉ
+
         const totalPages = doc.internal.pages.length - 1
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i)
@@ -653,194 +677,14 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
             )
             doc.text(`Página ${i} de ${totalPages}`, 190, 285, { align: 'right' })
         }
-        
-        // SALVAR
+
         const nomeCliente = cliente.nome || 'Cliente'
         const dataAtual = new Date().toISOString().split('T')[0]
-        const nomeArquivo = orcamentoID 
+        const nomeArquivo = orcamentoID
             ? `Orcamento_${orcamentoID}_${nomeCliente}_${dataAtual}.pdf`
             : `Orcamento_MetricWindows_${nomeCliente}_${dataAtual}.pdf`
-        
+
         doc.save(nomeArquivo)
-    }
-    // ========== VERIFICAR AUTENTICAÇÃO ==========
-    useEffect(() => {
-        const unsubscribe = verificarUsuarioLogado((user) => {
-            setUsuarioLogado(user)
-            setCarregandoAuth(false)
-        })
-        
-        return () => unsubscribe()
-    }, [])
-    
-    // ========== FUNÇÕES DE LOGIN/LOGOUT ==========
-    const handleLogin = async (e) => {
-        e.preventDefault()
-        const resultado = await fazerLogin(email, senha)
-        
-        if (resultado.sucesso) {
-            alert('✅ Login realizado com sucesso!')
-        } else {
-            alert(`❌ ${resultado.erro}`)
-        }
-    }
-    
-   const handleLogout = async () => {
-    if (window.confirm('Tem certeza que deseja sair?')) {
-        const resultado = await fazerLogout()
-        if (resultado) {
-            setUsuarioLogado(null)  // ← ADICIONE ESTA LINHA
-            alert('✅ Logout realizado!')
-        } else {
-            alert('❌ Erro ao fazer logout')
-        }
-    }
-}
-    
-    // ========== TELA DE CARREGAMENTO DE AUTENTICAÇÃO ==========
-    if (carregandoAuth) {
-        return (
-            <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: '100vh',
-                fontSize: '24px',
-                flexDirection: 'column',
-                gap: '20px',
-                backgroundColor: '#f0f4f8'
-            }}>
-                <div style={{ fontSize: '48px' }}>🔐</div>
-                <div style={{ fontWeight: 'bold', color: '#002a4d' }}>
-                    Verificando autenticação...
-                </div>
-            </div>
-        )
-    }
-    
-    // ========== TELA DE LOGIN ==========
-    if (!usuarioLogado) {
-        return (
-            <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                minHeight: '100vh',
-                backgroundColor: '#f0f4f8',
-                padding: '20px'
-            }}>
-                <div style={{
-                    backgroundColor: 'white',
-                    padding: '40px',
-                    borderRadius: '20px',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-                    maxWidth: '400px',
-                    width: '100%'
-                }}>
-                    <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                        <div style={{ fontSize: '64px', marginBottom: '20px' }}>🪟</div>
-                        <h1 style={{ 
-                            color: '#002a4d', 
-                            fontSize: '28px', 
-                            fontWeight: 'bold',
-                            marginBottom: '10px'
-                        }}>
-                            METRIC WINDOWS PT
-                        </h1>
-                        <p style={{ color: '#666', fontSize: '14px' }}>
-                            Sistema de Orçamentação
-                        </p>
-                    </div>
-                    
-                    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <div>
-                            <label style={{ 
-                                display: 'block', 
-                                fontWeight: 'bold', 
-                                color: '#002a4d',
-                                marginBottom: '8px',
-                                fontSize: '14px'
-                            }}>
-                                Email
-                            </label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                placeholder="seu@email.com"
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    border: '2px solid #ddd',
-                                    borderRadius: '8px',
-                                    fontSize: '16px',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-                        </div>
-                        
-                        <div>
-                            <label style={{ 
-                                display: 'block', 
-                                fontWeight: 'bold', 
-                                color: '#002a4d',
-                                marginBottom: '8px',
-                                fontSize: '14px'
-                            }}>
-                                Senha
-                            </label>
-                            <input
-                                type="password"
-                                value={senha}
-                                onChange={(e) => setSenha(e.target.value)}
-                                required
-                                placeholder="••••••••"
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    border: '2px solid #ddd',
-                                    borderRadius: '8px',
-                                    fontSize: '16px',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-                        </div>
-                        
-                        <button
-                            type="submit"
-                            style={{
-                                width: '100%',
-                                padding: '14px',
-                                backgroundColor: '#002a4d',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                marginTop: '10px'
-                            }}
-                        >
-                            🔐 Entrar
-                        </button>
-                    </form>
-                    
-                    <div style={{ 
-                        marginTop: '30px', 
-                        padding: '15px', 
-                        backgroundColor: '#fff3cd',
-                        border: '1px solid #ffc107',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#856404'
-                    }}>
-                        <strong>⚠️ Primeira vez?</strong><br/>
-                        Você precisa criar um usuário no Firebase Console primeiro!
-                    </div>
-                </div>
-            </div>
-        )
     }
 
     // ========== TELA DE CARREGAMENTO ==========
@@ -860,9 +704,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                 <div style={{ fontWeight: 'bold', color: '#002a4d' }}>
                     Carregando dados do Firebase...
                 </div>
-                <div style={{ fontSize: '16px', color: '#666' }}>
-                    Aguarde enquanto sincronizamos seus dados
-                </div>
             </div>
         )
     }
@@ -871,31 +712,12 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
     return (
         <div className="min-h-screen bg-metric-gray-light py-8 px-4">
             <div className="max-w-7xl mx-auto">
-                
-                {/* CABEÇALHO */}
-{/* CABEÇALHO */}
-<div className="bg-metric-blue rounded-2xl shadow-2xl p-8 mb-8 text-center relative">
-    <button
-        onClick={handleLogout}
-        style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            backgroundColor: '#ff6b35',
-            color: 'white',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            border: 'none',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            fontSize: '14px'
-        }}
-    >
-        🚪 Sair
-    </button>                    {logo && (
-                        <img 
-                            src={logo} 
-                            alt="Logo" 
+
+                <div className="bg-metric-blue rounded-2xl shadow-2xl p-8 mb-8 text-center relative">
+                    {logo && (
+                        <img
+                            src={logo}
+                            alt="Logo"
                             className="h-24 mx-auto mb-4 object-contain"
                         />
                     )}
@@ -912,7 +734,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                     )}
                 </div>
 
-                {/* ABAS */}
                 <div className="flex gap-2 mb-8 flex-wrap">
                     <button
                         onClick={() => setAbaAtiva('orcamento')}
@@ -946,7 +767,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                     </button>
                 </div>
 
-                {/* ABA DE HISTÓRICO */}
                 {abaAtiva === 'historico' && (
                     <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
                         <h2 className="text-2xl font-bold text-metric-blue mb-6 flex items-center gap-2">
@@ -999,16 +819,15 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                     </div>
                 )}
 
-                {/* ABA DE MODELOS */}
                 {abaAtiva === 'modelos' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                        
+
                         <div className="lg:col-span-1">
                             <div className="bg-white rounded-xl shadow-lg p-6">
                                 <h2 className="text-xl font-bold text-metric-orange mb-4 flex items-center gap-2">
                                     ➕ Novo Modelo
                                 </h2>
-                                
+
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-semibold text-metric-black-soft mb-2">
@@ -1022,7 +841,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                             placeholder="Ex: Janela Correr Branca"
                                         />
                                     </div>
-                                    
+
                                     <div>
                                         <label className="block text-sm font-semibold text-metric-black-soft mb-2">
                                             Foto do Modelo
@@ -1037,14 +856,14 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
 
                                     {novoModelo.foto && (
                                         <div>
-                                            <img 
-                                                src={novoModelo.foto} 
-                                                alt="Preview" 
+                                            <img
+                                                src={novoModelo.foto}
+                                                alt="Preview"
                                                 className="w-full h-40 object-cover rounded-lg border-2 border-metric-orange"
                                             />
                                         </div>
                                     )}
-                                    
+
                                     <button
                                         onClick={adicionarModelo}
                                         className="w-full bg-metric-orange text-white py-2 rounded-lg font-bold hover:bg-opacity-90 transition-all"
@@ -1060,7 +879,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 <h2 className="text-xl font-bold text-metric-blue mb-4">
                                     📚 Modelos Salvos
                                 </h2>
-                                
+
                                 {modelos.length === 0 ? (
                                     <p className="text-metric-gray-medium text-center py-8">
                                         Nenhum modelo criado ainda.
@@ -1080,11 +899,11 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                         🗑️
                                                     </button>
                                                 </div>
-                                                
+
                                                 {modelo.foto && (
-                                                    <img 
-                                                        src={modelo.foto} 
-                                                        alt={modelo.nome} 
+                                                    <img
+                                                        src={modelo.foto}
+                                                        alt={modelo.nome}
                                                         className="w-full h-24 object-cover rounded-lg"
                                                     />
                                                 )}
@@ -1098,13 +917,11 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                     </div>
                 )}
 
-                {/* ABA DE ORÇAMENTO */}
                 {abaAtiva === 'orcamento' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        
+
                         <div className="lg:col-span-2 space-y-6">
-                            
-                           {/* ID DO ORÇAMENTO */}
+
                             <div className="bg-white rounded-xl shadow-lg p-6">
                                 <h2 className="text-xl font-bold text-metric-blue mb-4">
                                     🔢 ID do Orçamento
@@ -1117,10 +934,10 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                     placeholder="Ex: 460"
                                 />
                                 <p className="text-xs text-metric-gray-medium mt-2 text-center">
-                                    Este ID aparecerá no PDF como: ORÇAMENTO 460
+                                    Este ID aparecerá no PDF
                                 </p>
                             </div>
-                            {/* BOTÕES DE AÇÃO */}
+
                             <div className="flex gap-2 flex-wrap">
                                 <button
                                     onClick={salvarOrcamento}
@@ -1135,8 +952,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                     ➕ Novo Orçamento
                                 </button>
                             </div>
-                            
-                            {/* UPLOAD DE LOGO */}
+
                             <div className="bg-white rounded-xl shadow-lg p-6">
                                 <h2 className="text-xl font-bold text-metric-blue mb-4 flex items-center gap-2">
                                     🖼️ Logo da Empresa
@@ -1152,7 +968,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 )}
                             </div>
 
-                            {/* DADOS DO CLIENTE */}
                             <div className="bg-white rounded-xl shadow-lg p-6">
                                 <h2 className="text-xl font-bold text-metric-blue mb-4 flex items-center gap-2">
                                     👤 Dados do Cliente
@@ -1211,7 +1026,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 </div>
                             </div>
 
-                            {/* JANELAS */}
                             <div className="bg-white rounded-xl shadow-lg p-6">
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-xl font-bold text-metric-blue flex items-center gap-2">
@@ -1275,11 +1089,11 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                         onChange={(e) => atualizarJanela(janela.id, 'descricao', e.target.value)}
                                                         className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none resize-none"
                                                         rows="2"
-                                                        placeholder="Ex: Janela de Correr - 2000x1500mm - Antracite"
+                                                        placeholder="Ex: Janela de Correr - 2000x1500mm"
                                                     />
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                                <div className="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <label className="block text-sm font-semibold text-metric-black-soft mb-2">
                                                             Quantidade
@@ -1287,11 +1101,9 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                         <input
                                                             type="number"
                                                             min="1"
-                                                            step="1"
                                                             value={janela.quantidade}
                                                             onChange={(e) => atualizarJanela(janela.id, 'quantidade', e.target.value)}
                                                             className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
-                                                            placeholder="1"
                                                         />
                                                     </div>
                                                     <div>
@@ -1300,18 +1112,16 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                         </label>
                                                         <input
                                                             type="number"
-                                                            step="0.1"
                                                             value={janela.percentualExtra}
                                                             onChange={(e) => atualizarJanela(janela.id, 'percentualExtra', e.target.value)}
                                                             className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
-                                                            placeholder="0"
                                                         />
                                                     </div>
                                                 </div>
 
-                                                <div className="mb-3">
+                                                <div>
                                                     <label className="block text-sm font-semibold text-metric-black-soft mb-2">
-                                                        Acabamentos (clique para adicionar %)
+                                                        Acabamentos
                                                     </label>
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <button
@@ -1336,6 +1146,7 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                         </button>
                                                     </div>
                                                 </div>
+
                                                 <div className="grid grid-cols-3 gap-3">
                                                     <div>
                                                         <label className="block text-sm font-semibold text-metric-black-soft mb-2">
@@ -1347,7 +1158,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                             value={janela.preco}
                                                             onChange={(e) => atualizarJanela(janela.id, 'preco', e.target.value)}
                                                             className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
-                                                            placeholder="450.00"
                                                         />
                                                     </div>
                                                     <div>
@@ -1360,7 +1170,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                             value={janela.precoMontagem}
                                                             onChange={(e) => atualizarJanela(janela.id, 'precoMontagem', e.target.value)}
                                                             className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
-                                                            placeholder="50.00"
                                                         />
                                                     </div>
                                                     <div>
@@ -1373,7 +1182,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                                             value={janela.desconto}
                                                             onChange={(e) => atualizarJanela(janela.id, 'desconto', e.target.value)}
                                                             className="w-full px-4 py-2 border-2 border-metric-gray-medium rounded-lg focus:border-metric-orange focus:outline-none"
-                                                            placeholder="5"
                                                         />
                                                     </div>
                                                 </div>
@@ -1389,7 +1197,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 </div>
                             </div>
 
-                            {/* CONDIÇÕES */}
                             <div className="bg-white rounded-xl shadow-lg p-6">
                                 <h2 className="text-xl font-bold text-metric-blue mb-4">
                                     📋 Condições de Fornecimento
@@ -1404,7 +1211,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
 
                         </div>
 
-                        {/* COLUNA DIREITA - RESUMO */}
                         <div className="lg:col-span-1">
                             <div className="bg-white rounded-xl shadow-lg p-6 sticky top-4">
                                 <h2 className="text-xl font-bold text-metric-blue mb-4">
@@ -1412,7 +1218,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 </h2>
 
                                 <div className="space-y-3 text-sm">
-                                    
                                     <div className="border-t pt-3"></div>
 
                                     <div className="flex justify-between">
@@ -1440,14 +1245,14 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                     </div>
                                 </div>
 
-                                <button 
+                                <button
                                     onClick={gerarPDF}
                                     className="w-full mt-6 bg-metric-orange text-white py-3 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all shadow-lg"
                                 >
                                     📄 Gerar PDF
                                 </button>
 
-                                <button 
+                                <button
                                     onClick={salvarOrcamento}
                                     className="w-full mt-3 bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all shadow-lg"
                                 >
@@ -1455,8 +1260,6 @@ Caso o cliente solicite alterações ao orçamento após a adjudicação, o valo
                                 </button>
 
                                 <div className="mt-4 text-xs text-metric-gray-medium space-y-1">
-                                    <p>✓ Montagem embutida</p>
-                                    <p>✓ IVAs separados</p>
                                     <p>✓ Firebase conectado</p>
                                     <p>✓ Dados na nuvem ☁️</p>
                                 </div>
